@@ -307,18 +307,40 @@ def ask_llm_batch(rows: List[dict]) -> tuple[List[float], str | None]:
         content = response.choices[0].message.content
         
         # Parse the response - extract JSON array and summary
-        # Find the first JSON array in the response
+        # Find the first JSON array in the response using a more robust approach
         import re
-        json_match = re.search(r'\[.*?\]', content, re.DOTALL)
         
-        if not json_match:
-            raise ValueError("Could not find JSON array in response")
+        # First try to find a properly formatted JSON array
+        try:
+            # Look for the pattern that starts with [ and ends with ] with balanced brackets
+            content_lines = content.strip().split('\n')
+            json_text = ""
+            in_json = False
+            bracket_count = 0
             
-        scores_json = json_match.group(0)
-        scores = json.loads(scores_json)
+            for line in content_lines:
+                line = line.strip()
+                if not in_json and line.startswith('['):
+                    in_json = True
+                
+                if in_json:
+                    json_text += line
+                    bracket_count += line.count('[') - line.count(']')
+                    
+                    if bracket_count == 0 and ']' in line:
+                        break
+            
+            if not json_text:
+                raise ValueError("Could not find JSON array in response")
+                
+            scores = json.loads(json_text)
+        except json.JSONDecodeError as e:
+            st.error(f"JSON parsing error: {e}")
+            raise ValueError(f"Failed to parse JSON array: {e}")
         
         # Extract the summary (everything after the JSON array)
-        summary_text = content[json_match.end():].strip()
+        summary_start = content.find(json_text) + len(json_text) if 'json_text' in locals() else 0
+        summary_text = content[summary_start:].strip()
         if not summary_text:
             summary_text = "Analysis complete. Confidence scores generated based on name and address similarity."
             
@@ -641,15 +663,17 @@ if uploaded:
             # Create a display version of the dataframe without the Duplicates column
             display_df = dup_df.drop(columns=["Duplicates"]).copy()
             
-            # Add a column to indicate expandable rows
-            display_df["Expand"] = "➕"
+            # Add columns for actions
+            display_df["Expand"] = "➕ Details"
+            display_df["View"] = "👁️ View"
             
             gb = GridOptionsBuilder.from_dataframe(display_df)
             # Set reasonable page size and pagination options
             gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=25)
             gb.configure_default_column(resizable=True, filter=True, sortable=True)
             gb.configure_column("NeedsAI", cellRenderer="function(params){return params.value ? '🤖' : ''}")
-            gb.configure_column("Expand", cellRenderer="function(params){return params.value;}", width=70)
+            gb.configure_column("Expand", cellRenderer="function(params){return params.value;}", width=100)
+            gb.configure_column("View", cellRenderer="function(params){return params.value;}", width=100)
             
             # Add checkbox selection column as first column
             gb.configure_selection("multiple", use_checkbox=True, groupSelectsChildren=True, groupSelectsFiltered=True)
@@ -666,29 +690,167 @@ if uploaded:
             grid_res = AgGrid(display_df, gb.build(), height=400, key="grid")
             selected = grid_res["selected_rows"]
             
+            # Track the currently expanded row in session state
+            if "expanded_row" not in st.session_state:
+                st.session_state["expanded_row"] = None
+                
             # Handle row expansion when Expand column is clicked
-            if grid_res.get("clicked_cell") and grid_res["clicked_cell"].get("column") == "Expand":
+            if grid_res.get("clicked_cell"):
                 clicked_row = grid_res["clicked_cell"]["row"]
-                master_uid = dup_df.iloc[clicked_row]["master_uid"]
+                clicked_column = grid_res["clicked_cell"]["column"]
                 
-                # Get duplicates for this master
-                duplicates = dup_df.iloc[clicked_row]["Duplicates"]
-                
-                # Create a DataFrame from the duplicates list
-                if duplicates:
-                    duplicates_df = pd.DataFrame(duplicates)
+                if clicked_column == "Expand":
+                    # Toggle expansion state
+                    if st.session_state["expanded_row"] == clicked_row:
+                        st.session_state["expanded_row"] = None
+                    else:
+                        st.session_state["expanded_row"] = clicked_row
+                        
+                    master_uid = dup_df.iloc[clicked_row]["master_uid"]
                     
-                    # Display the duplicates in an expander
-                    with st.expander(f"Duplicates for {dup_df.iloc[clicked_row]['MasterName']} (Row {dup_df.iloc[clicked_row]['MasterRow']})", expanded=True):
-                        st.dataframe(duplicates_df)
+                    # Get duplicates for this master
+                    duplicates = dup_df.iloc[clicked_row]["Duplicates"]
+                    
+                    # Create a DataFrame from the duplicates list
+                    if duplicates and st.session_state["expanded_row"] == clicked_row:
+                        duplicates_df = pd.DataFrame(duplicates)
                         
-                        # Add buttons for actions on duplicates
-                        if st.button("Merge All to Master", key=f"merge_{master_uid}"):
-                            st.success("Merge operation would be performed here")
-                        
-                        if st.button("Analyze Duplicates with AI", key=f"analyze_{master_uid}"):
-                            # This would call the AI analysis function
-                            st.info("AI analysis would be performed here")
+                        # Display the duplicates in an expander with visual styling
+                        with st.container():
+                            st.markdown(f"""
+                            <div style="background-color:#1e1e2e; border-radius:8px; padding:15px; margin:15px 0; border:1px solid #4e8df5;">
+                                <h4 style="color:#4e8df5; margin-top:0;">Duplicates for {dup_df.iloc[clicked_row]['MasterName']} (Row {dup_df.iloc[clicked_row]['MasterRow']})</h4>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Style the dataframe
+                            st.dataframe(
+                                duplicates_df,
+                                height=300,
+                                use_container_width=True
+                            )
+                            
+                            # Add buttons for actions on duplicates with better styling
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                if st.button("Merge All to Master", key=f"merge_{master_uid}", use_container_width=True):
+                                    st.success("Merge operation would be performed here")
+                            
+                            with col2:
+                                if st.button("Analyze This Group with AI", key=f"analyze_{master_uid}", use_container_width=True):
+                                    # This would call the AI analysis function for just this group
+                                    # Create a list with just these duplicates
+                                    target_rows = duplicates
+                                    
+                                    # Format rows for AI analysis
+                                    ai_rows = []
+                                    for dup in target_rows:
+                                        ai_rows.append({
+                                            "Name1": dup_df.iloc[clicked_row]["MasterName"],
+                                            "Name2": dup["Name"],
+                                            "Addr1": dup_df.iloc[clicked_row]["MasterAddress"],
+                                            "Addr2": dup["Address"],
+                                            "Name%": dup["Name%"],
+                                            "Addr%": dup["Addr%"],
+                                            "Overall%": dup["Overall%"],
+                                            "uid": dup["uid"]
+                                        })
+                                    
+                                    # Call the AI function with just these rows
+                                    scores, summary = ask_llm_batch(ai_rows)
+                                    
+                                    if scores[0] is None or summary is None:
+                                        st.error("AI analysis failed. No confidence scores were updated.")
+                                    else:
+                                        st.success(f"AI analysis complete! Updated {len([s for s in scores if s is not None])} confidence scores.")
+                                        
+                                        # Update LLM_conf in the duplicates lists
+                                        score_map = {r["uid"]: s for r, s in zip(ai_rows, scores)}
+                                        
+                                        # Update just this master's duplicates
+                                        for j, dup in enumerate(dup_df.iloc[clicked_row]["Duplicates"]):
+                                            if dup["uid"] in score_map:
+                                                dup_df.at[clicked_row, "Duplicates"][j]["LLM_conf"] = score_map[dup["uid"]]
+                                        
+                                        # Store updated dataframe in session state
+                                        st.session_state["dup_df"] = dup_df
+                
+                elif clicked_column == "View":
+                    # Show a popup with detailed comparison view
+                    master_row = dup_df.iloc[clicked_row]
+                    duplicates = master_row["Duplicates"]
+                    
+                    if duplicates:
+                        with st.container():
+                            st.markdown(f"""
+                            <div style="background-color:#1e1e2e; border-radius:8px; padding:15px; margin:15px 0; border:1px solid #4e8df5;">
+                                <h4 style="color:#4e8df5; margin-top:0;">Detailed Comparison View</h4>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Master record details
+                            st.markdown(f"""
+                            <div style="background-color:#262730; padding:15px; border-radius:5px; margin-bottom:15px;">
+                                <h5 style="margin-top:0; color:#4e8df5;">Master Record (Row {master_row['MasterRow']})</h5>
+                                <p><strong>Name:</strong> {master_row['MasterName']}</p>
+                                <p><strong>Address:</strong> {master_row['MasterAddress']}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Create comparison cards for each duplicate
+                            for i, dup in enumerate(duplicates):
+                                # Calculate confidence indicator color
+                                if dup.get("LLM_conf"):
+                                    conf_color = "#28a745" if dup["LLM_conf"] > 0.8 else "#ffc107" if dup["LLM_conf"] > 0.5 else "#dc3545"
+                                    conf_text = f"{dup['LLM_conf']:.2f}"
+                                else:
+                                    conf_color = "#6c757d"
+                                    conf_text = "N/A"
+                                
+                                st.markdown(f"""
+                                <div style="background-color:#262730; padding:15px; border-radius:5px; margin-bottom:10px; border-left:4px solid {conf_color};">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                        <h5 style="margin:0; color:#4e8df5;">Duplicate #{i+1} (Row {dup['Row']})</h5>
+                                        <div style="background-color:{conf_color}; color:white; padding:3px 8px; border-radius:10px; font-size:0.8em;">
+                                            AI Conf: {conf_text}
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="display:flex; margin-bottom:10px;">
+                                        <div style="flex:1; margin-right:10px;">
+                                            <p style="color:#aaa; margin:0; font-size:0.8em;">NAME SIMILARITY</p>
+                                            <p style="margin:0; font-size:1.2em;">{dup['Name%']}%</p>
+                                        </div>
+                                        <div style="flex:1; margin-right:10px;">
+                                            <p style="color:#aaa; margin:0; font-size:0.8em;">ADDRESS SIMILARITY</p>
+                                            <p style="margin:0; font-size:1.2em;">{dup['Addr%']}%</p>
+                                        </div>
+                                        <div style="flex:1;">
+                                            <p style="color:#aaa; margin:0; font-size:0.8em;">OVERALL</p>
+                                            <p style="margin:0; font-size:1.2em;">{dup['Overall%']}%</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <p><strong>Name:</strong> {dup['Name']}</p>
+                                        <p><strong>Address:</strong> {dup['Address']}</p>
+                                    </div>
+                                    
+                                    <div style="margin-top:10px;">
+                                        <p style="color:#aaa; font-size:0.9em;">Name Diff:</p>
+                                        <div style="background-color:#1e1e2e; padding:8px; border-radius:5px; font-family:monospace;">
+                                            {diff_html(master_row['MasterName'], dup['Name'])}
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="margin-top:10px;">
+                                        <p style="color:#aaa; font-size:0.9em;">Address Diff:</p>
+                                        <div style="background-color:#1e1e2e; padding:8px; border-radius:5px; font-family:monospace;">
+                                            {diff_html(master_row['MasterAddress'], dup['Address'])}
+                                        </div>
+                                    </div>
+                                </div>
+                                """, unsafe_allow_html=True)
         except ModuleNotFoundError:
             st.info("Install st_aggrid for richer table interactivity.")
             selected = []
@@ -716,27 +878,37 @@ if uploaded:
         ai_col1, ai_col2 = st.columns([1, 3])
         
         with ai_col1:
-            analyze_button = st.button("Analyze Selected with AI")
+            # Disable the button if no rows are selected
+            button_disabled = len(selected) == 0 if isinstance(selected, list) else True
+            analyze_button = st.button("Analyze Selected with AI", disabled=button_disabled)
+            
+            if button_disabled:
+                st.caption("⚠️ Select rows from the grid above first")
         
         with ai_col2:
             status_placeholder = st.empty()
             
-        if analyze_button:
-            # Fix the DataFrame truth value error by checking if selected is empty
-            if isinstance(selected, list) and len(selected) > 0:
-                # Process selected master records
-                target_masters = selected
-                
-                # Collect all duplicates from selected masters
-                all_duplicates = []
-                for master in target_masters:
-                    master_idx = master.get("_selectedRowNodeInfo", {}).get("nodeRowIndex")
-                    if master_idx is not None and master_idx < len(dup_df):
-                        duplicates = dup_df.iloc[master_idx]["Duplicates"]
-                        if duplicates:
-                            all_duplicates.extend(duplicates)
-                
-                target_rows = all_duplicates
+        if analyze_button and not button_disabled:
+            # Process only the selected rows
+            target_masters = selected
+            
+            # Collect all duplicates from selected masters
+            all_duplicates = []
+            selected_indices = []
+            
+            for master in target_masters:
+                master_idx = master.get("_selectedRowNodeInfo", {}).get("nodeRowIndex")
+                if master_idx is not None and master_idx < len(dup_df):
+                    selected_indices.append(master_idx)
+                    duplicates = dup_df.iloc[master_idx]["Duplicates"]
+                    if duplicates:
+                        all_duplicates.extend(duplicates)
+            
+            # Show which rows are being processed
+            if selected_indices:
+                status_placeholder.info(f"Processing {len(selected_indices)} selected rows with {len(all_duplicates)} potential duplicates")
+            
+            target_rows = all_duplicates
             else:
                 # Process all masters that need AI
                 masters_needing_ai = dup_df[dup_df["NeedsAI"] == True]
