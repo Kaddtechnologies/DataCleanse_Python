@@ -26,7 +26,7 @@ pathlib
 
 thefuzz[speedup]     # pulls python-levenshtein
 neofuzz              # optional, faster fuzzy
-st_aggrid            # optional interactive grid
+streamlit-aggrid     # optional interactive grid
 xlsxwriter           # Excel export (primary)
 openpyxl             # Excel export fallback
 
@@ -129,8 +129,8 @@ def build_duplicate_df(df: pd.DataFrame, col_map: Dict[str, str]) -> pd.DataFram
     MAX_COMPARISONS_PER_BLOCK = 1000
     MAX_TOTAL_COMPARISONS = 10000
     
-    pairs = []
-    total_comparisons = 0
+    # Dictionary to track master records and their duplicates
+    master_records = {}
     
     for block_key, idxs in blocks.items():
         if len(idxs) < 2:
@@ -168,22 +168,82 @@ def build_duplicate_df(df: pd.DataFrame, col_map: Dict[str, str]) -> pd.DataFram
             # Only include pairs with reasonable similarity
             if overall >= 70:
                 needs_ai = overall < 90
-                pairs.append({
-                "Row1": int(r1["ExcelRow"])+2,
-                "Row2": int(r2["ExcelRow"])+2,
-                "Name1": r1[cols["customer_name"]],
-                "Name2": r2[cols["customer_name"]],
-                "Addr1": r1[cols["address"]] if cols["address"] else "",
-                "Addr2": r2[cols["address"]] if cols["address"] else "",
-                "Name%": name_s,
-                "Addr%": addr_s,
-                "Overall%": overall,
-                "NeedsAI": needs_ai,
-                "LLM_conf": None,
-                "uid": str(uuid.uuid4())
-            })
-    dup_df = pd.DataFrame(pairs)
-    return dup_df.sort_values("Overall%", ascending=False).reset_index(drop=True)
+                
+                # Create a unique pair ID
+                pair_uid = str(uuid.uuid4())
+                
+                # Create duplicate record entry
+                duplicate_record = {
+                    "Row": int(r2["ExcelRow"])+2,
+                    "Name": r2[cols["customer_name"]],
+                    "Address": r2[cols["address"]] if cols["address"] else "",
+                    "Name%": name_s,
+                    "Addr%": addr_s,
+                    "Overall%": overall,
+                    "NeedsAI": needs_ai,
+                    "LLM_conf": None,
+                    "uid": pair_uid
+                }
+                
+                # Check if r1 is already a master record
+                master_row = int(r1["ExcelRow"])+2
+                if master_row in master_records:
+                    # Add r2 as a duplicate to existing master
+                    master_records[master_row]["duplicates"].append(duplicate_record)
+                else:
+                    # Create a new master record with r2 as its first duplicate
+                    master_records[master_row] = {
+                        "Row": master_row,
+                        "Name": r1[cols["customer_name"]],
+                        "Address": r1[cols["address"]] if cols["address"] else "",
+                        "duplicates": [duplicate_record],
+                        "master_uid": str(uuid.uuid4())
+                    }
+                
+                # Check if r2 is already a master record
+                # If so, we need to merge its duplicates into r1's master record
+                duplicate_row = int(r2["ExcelRow"])+2
+                if duplicate_row in master_records:
+                    # If r2 is already a master, merge its duplicates into r1's master
+                    if master_row != duplicate_row:  # Avoid self-reference
+                        master_records[master_row]["duplicates"].extend(master_records[duplicate_row]["duplicates"])
+                        # Remove r2 as a master since it's now a duplicate of r1
+                        del master_records[duplicate_row]
+    
+    # Convert master_records dictionary to a DataFrame
+    masters = []
+    for master_row, master_data in master_records.items():
+        # Count duplicates
+        duplicate_count = len(master_data["duplicates"])
+        
+        # Calculate average similarity
+        avg_similarity = sum(dup["Overall%"] for dup in master_data["duplicates"]) / duplicate_count if duplicate_count > 0 else 0
+        
+        # Check if any duplicates need AI
+        needs_ai = any(dup["NeedsAI"] for dup in master_data["duplicates"])
+        
+        # Create master record entry
+        master_entry = {
+            "MasterRow": master_data["Row"],
+            "MasterName": master_data["Name"],
+            "MasterAddress": master_data["Address"],
+            "DuplicateCount": duplicate_count,
+            "AvgSimilarity": round(avg_similarity),
+            "NeedsAI": needs_ai,
+            "Duplicates": master_data["duplicates"],  # Store the list of duplicates
+            "master_uid": master_data["master_uid"]
+        }
+        masters.append(master_entry)
+    
+    # Create DataFrame from masters list
+    dup_df = pd.DataFrame(masters)
+    
+    # Sort by average similarity (descending)
+    if not dup_df.empty:
+        return dup_df.sort_values("AvgSimilarity", ascending=False).reset_index(drop=True)
+    else:
+        return pd.DataFrame(columns=["MasterRow", "MasterName", "MasterAddress", "DuplicateCount",
+                                    "AvgSimilarity", "NeedsAI", "Duplicates", "master_uid"])
 
 
 # ---------------------------------------------------------------------------
@@ -520,15 +580,19 @@ if uploaded:
         **Why use it:** Gives you a quick overview of how many duplicates were found and what action they need.
         """)
         
-        hi = dup_df[dup_df["Overall%"] >= 98]
-        med = dup_df[(dup_df["Overall%"] < 98) & (dup_df["Overall%"] >= 90)]
-        low = dup_df[dup_df["Overall%"] < 90]
+        # Count masters by confidence level
+        hi = dup_df[dup_df["AvgSimilarity"] >= 98]
+        med = dup_df[(dup_df["AvgSimilarity"] < 98) & (dup_df["AvgSimilarity"] >= 90)]
+        low = dup_df[dup_df["NeedsAI"] == True]
         
         # Create 4 columns for metrics
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Auto‑merge", len(hi))
         c2.metric("Needs Review", len(med))
         c3.metric("Needs AI", len(low))
+        
+        # Calculate total duplicates
+        total_duplicates = dup_df["DuplicateCount"].sum() if not dup_df.empty else 0
         
         # Show blocking statistics with tooltip explanation
         if "block_stats" in st.session_state:
@@ -552,13 +616,21 @@ if uploaded:
         
         # Interactive grid (basic DataFrame if st_aggrid not installed)
         try:
-            from st_aggrid import AgGrid, GridOptionsBuilder
-
-            gb = GridOptionsBuilder.from_dataframe(dup_df)
+            from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
+            
+            # Create a display version of the dataframe without the Duplicates column
+            display_df = dup_df.drop(columns=["Duplicates"]).copy()
+            
+            # Add a column to indicate expandable rows
+            display_df["Expand"] = "➕"
+            
+            gb = GridOptionsBuilder.from_dataframe(display_df)
             # Set reasonable page size and pagination options
             gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=25)
             gb.configure_default_column(resizable=True, filter=True, sortable=True)
             gb.configure_column("NeedsAI", cellRenderer="function(params){return params.value ? '🤖' : ''}")
+            gb.configure_column("Expand", cellRenderer="function(params){return params.value;}", width=70)
+            
             # Add checkbox selection column as first column
             gb.configure_selection("multiple", use_checkbox=True, groupSelectsChildren=True, groupSelectsFiltered=True)
             gb.configure_grid_options(suppressRowClickSelection=True)
@@ -571,12 +643,45 @@ if uploaded:
                 rowBuffer=25
             )
             
-            grid_res = AgGrid(dup_df, gb.build(), height=400, key="grid")
+            grid_res = AgGrid(display_df, gb.build(), height=400, key="grid")
             selected = grid_res["selected_rows"]
+            
+            # Handle row expansion when Expand column is clicked
+            if grid_res.get("clicked_cell") and grid_res["clicked_cell"].get("column") == "Expand":
+                clicked_row = grid_res["clicked_cell"]["row"]
+                master_uid = dup_df.iloc[clicked_row]["master_uid"]
+                
+                # Get duplicates for this master
+                duplicates = dup_df.iloc[clicked_row]["Duplicates"]
+                
+                # Create a DataFrame from the duplicates list
+                if duplicates:
+                    duplicates_df = pd.DataFrame(duplicates)
+                    
+                    # Display the duplicates in an expander
+                    with st.expander(f"Duplicates for {dup_df.iloc[clicked_row]['MasterName']} (Row {dup_df.iloc[clicked_row]['MasterRow']})", expanded=True):
+                        st.dataframe(duplicates_df)
+                        
+                        # Add buttons for actions on duplicates
+                        if st.button("Merge All to Master", key=f"merge_{master_uid}"):
+                            st.success("Merge operation would be performed here")
+                        
+                        if st.button("Analyze Duplicates with AI", key=f"analyze_{master_uid}"):
+                            # This would call the AI analysis function
+                            st.info("AI analysis would be performed here")
         except ModuleNotFoundError:
             st.info("Install st_aggrid for richer table interactivity.")
             selected = []
-            st.dataframe(dup_df)
+            
+            # Create a simpler display without st_aggrid
+            display_df = dup_df.drop(columns=["Duplicates"]).copy()
+            st.dataframe(display_df)
+            
+            # Add expanders for each master record
+            for idx, row in dup_df.iterrows():
+                with st.expander(f"Duplicates for {row['MasterName']} (Row {row['MasterRow']})"):
+                    if row["Duplicates"]:
+                        st.dataframe(pd.DataFrame(row["Duplicates"]))
 
         # AI Assistance with instructions
         st.subheader("🤖 AI Assistance")
@@ -599,9 +704,31 @@ if uploaded:
         if analyze_button:
             # Fix the DataFrame truth value error by checking if selected is empty
             if isinstance(selected, list) and len(selected) > 0:
-                target_rows = selected
+                # Process selected master records
+                target_masters = selected
+                
+                # Collect all duplicates from selected masters
+                all_duplicates = []
+                for master in target_masters:
+                    master_idx = master.get("_selectedRowNodeInfo", {}).get("nodeRowIndex")
+                    if master_idx is not None and master_idx < len(dup_df):
+                        duplicates = dup_df.iloc[master_idx]["Duplicates"]
+                        if duplicates:
+                            all_duplicates.extend(duplicates)
+                
+                target_rows = all_duplicates
             else:
-                target_rows = dup_df[dup_df["NeedsAI"]].to_dict("records")
+                # Process all masters that need AI
+                masters_needing_ai = dup_df[dup_df["NeedsAI"] == True]
+                
+                # Collect all duplicates from these masters
+                all_duplicates = []
+                for _, master in masters_needing_ai.iterrows():
+                    duplicates = master["Duplicates"]
+                    if duplicates:
+                        all_duplicates.extend(duplicates)
+                
+                target_rows = all_duplicates
                 
             if not target_rows or len(target_rows) == 0:
                 status_placeholder.info("No rows require AI analysis.")
@@ -609,20 +736,46 @@ if uploaded:
                 progress_bar = status_placeholder.progress(0)
                 progress_bar.progress(10, text="Preparing data for AI analysis...")
 
-            try:
-                progress_bar.progress(30, text=f"Sending {len(target_rows)} rows to AI...")
-                scores = ask_llm_batch(target_rows)
+                try:
+                    progress_bar.progress(30, text=f"Sending {len(target_rows)} rows to AI...")
+                    
+                    # Format rows for AI analysis
+                    ai_rows = []
+                    for dup in target_rows:
+                        # Find the master for this duplicate
+                        for _, master in dup_df.iterrows():
+                            if any(d["uid"] == dup["uid"] for d in master["Duplicates"]):
+                                ai_rows.append({
+                                    "Name1": master["MasterName"],
+                                    "Name2": dup["Name"],
+                                    "Addr1": master["MasterAddress"],
+                                    "Addr2": dup["Address"],
+                                    "Name%": dup["Name%"],
+                                    "Addr%": dup["Addr%"],
+                                    "Overall%": dup["Overall%"],
+                                    "uid": dup["uid"]
+                                })
+                                break
+                    
+                    scores = ask_llm_batch(ai_rows)
 
-                progress_bar.progress(70, text="Processing AI results...")
-                score_map = {r["uid"]: s for r, s in zip(target_rows, scores)}
-                dup_df["LLM_conf"] = dup_df.apply(lambda r: score_map.get(r["uid"], r["LLM_conf"]), axis=1)
+                    progress_bar.progress(70, text="Processing AI results...")
+                    
+                    # Update LLM_conf in the duplicates lists
+                    score_map = {r["uid"]: s for r, s in zip(ai_rows, scores)}
+                    
+                    # Update the duplicates in each master record
+                    for i, master in dup_df.iterrows():
+                        for j, dup in enumerate(master["Duplicates"]):
+                            if dup["uid"] in score_map:
+                                dup_df.at[i, "Duplicates"][j]["LLM_conf"] = score_map[dup["uid"]]
+                    
+                    progress_bar.progress(100, text="AI analysis complete!")
+                    st.session_state["dup_df"] = dup_df
 
-                progress_bar.progress(100, text="AI analysis complete!")
-                st.session_state["dup_df"] = dup_df
-
-                status_placeholder.success("AI analysis complete. Column 'LLM_conf' updated.")
-            except Exception as e:
-                status_placeholder.error(f"AI analysis failed: {str(e)}")
+                    status_placeholder.success("AI analysis complete. LLM confidence scores updated.")
+                except Exception as e:
+                    status_placeholder.error(f"AI analysis failed: {str(e)}")
 
 
         # Flash Card Reviewer
@@ -663,8 +816,28 @@ if uploaded:
         if "card_decisions" not in st.session_state:
             st.session_state["card_decisions"] = {}
 
-        # Get medium confidence pairs
-        med_df = dup_df[(dup_df["Overall%"] < 98) & (dup_df["Overall%"] >= 90)].reset_index(drop=True)
+        # Get medium confidence masters
+        med_masters = dup_df[(dup_df["AvgSimilarity"] < 98) & (dup_df["AvgSimilarity"] >= 90)].reset_index(drop=True)
+        
+        # Create a flattened view of all medium confidence duplicates for flash card review
+        med_pairs = []
+        for _, master in med_masters.iterrows():
+            for dup in master["Duplicates"]:
+                if dup["Overall%"] >= 90 and dup["Overall%"] < 98:
+                    med_pairs.append({
+                        "MasterRow": master["MasterRow"],
+                        "MasterName": master["MasterName"],
+                        "MasterAddress": master["MasterAddress"],
+                        "DuplicateRow": dup["Row"],
+                        "DuplicateName": dup["Name"],
+                        "DuplicateAddress": dup["Address"],
+                        "Name%": dup["Name%"],
+                        "Addr%": dup["Addr%"],
+                        "Overall%": dup["Overall%"],
+                        "uid": dup["uid"]
+                    })
+        
+        med_df = pd.DataFrame(med_pairs)
         
         # Display progress metrics
         if not med_df.empty:
@@ -703,18 +876,18 @@ if uploaded:
                 with col1:
                     st.markdown("<div style='background-color:#262730; padding:15px; border-radius:5px; margin-bottom:15px;'>", unsafe_allow_html=True)
                     st.markdown("<h4>Customer Name</h4>", unsafe_allow_html=True)
-                    st.markdown(diff_html(row["Name1"], row["Name2"]), unsafe_allow_html=True)
+                    st.markdown(diff_html(row["MasterName"], row["DuplicateName"]), unsafe_allow_html=True)
                     
                     st.markdown("<h4 style='margin-top:15px;'>Address</h4>", unsafe_allow_html=True)
-                    st.markdown(diff_html(row["Addr1"], row["Addr2"]), unsafe_allow_html=True)
+                    st.markdown(diff_html(row["MasterAddress"], row["DuplicateAddress"]), unsafe_allow_html=True)
                     
                     # Add more details if available
                     st.markdown("<h4 style='margin-top:15px;'>Record Details</h4>", unsafe_allow_html=True)
                     st.markdown(f"""
                     <table style="width:100%; border-collapse: collapse;">
                         <tr>
-                            <td style="padding:5px; border-bottom:1px solid #4e4e4e; width:50%;">Left Record (Row {row['Row1']})</td>
-                            <td style="padding:5px; border-bottom:1px solid #4e4e4e; width:50%;">Right Record (Row {row['Row2']})</td>
+                            <td style="padding:5px; border-bottom:1px solid #4e4e4e; width:50%;">Master Record (Row {row['MasterRow']})</td>
+                            <td style="padding:5px; border-bottom:1px solid #4e4e4e; width:50%;">Duplicate Record (Row {row['DuplicateRow']})</td>
                         </tr>
                         <tr>
                             <td style="padding:5px; color:#aaa;">Name Match: {row['Name%']}%</td>
@@ -800,7 +973,42 @@ if uploaded:
                 try:
                     buffer = io.BytesIO()
                     with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-                        dup_df.to_excel(writer, sheet_name="Duplicates", index=False)
+                        # Create a flattened version of the data for export
+                        export_rows = []
+                        for _, master in dup_df.iterrows():
+                            # Add master record
+                            master_row = {
+                                "RecordType": "Master",
+                                "MasterRow": master["MasterRow"],
+                                "MasterName": master["MasterName"],
+                                "MasterAddress": master["MasterAddress"],
+                                "DuplicateCount": master["DuplicateCount"],
+                                "AvgSimilarity": master["AvgSimilarity"],
+                                "NeedsAI": "Yes" if master["NeedsAI"] else "No"
+                            }
+                            export_rows.append(master_row)
+                            
+                            # Add duplicate records
+                            for dup in master["Duplicates"]:
+                                dup_row = {
+                                    "RecordType": "Duplicate",
+                                    "MasterRow": master["MasterRow"],
+                                    "MasterName": master["MasterName"],
+                                    "DuplicateRow": dup["Row"],
+                                    "DuplicateName": dup["Name"],
+                                    "DuplicateAddress": dup["Address"],
+                                    "Name%": dup["Name%"],
+                                    "Addr%": dup["Addr%"],
+                                    "Overall%": dup["Overall%"],
+                                    "NeedsAI": "Yes" if dup["NeedsAI"] else "No",
+                                    "LLM_conf": dup["LLM_conf"] if dup["LLM_conf"] is not None else ""
+                                }
+                                export_rows.append(dup_row)
+                        
+                        # Create export DataFrame
+                        export_df = pd.DataFrame(export_rows)
+                        export_df.to_excel(writer, sheet_name="Duplicates", index=False)
+                        
                     st.download_button(
                         label="Download Excel",
                         data=buffer.getvalue(),
@@ -813,11 +1021,14 @@ if uploaded:
                         # Fallback to openpyxl
                         buffer = io.BytesIO()
                         with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-                            dup_df.to_excel(writer, sheet_name="Duplicates", index=False)
+                            # Create a simplified version for fallback
+                            display_df = dup_df.drop(columns=["Duplicates"]).copy()
+                            display_df.to_excel(writer, sheet_name="Masters", index=False)
+                            
                         st.download_button(
-                            label="Download Excel (Fallback)",
+                            label="Download Excel (Fallback - Masters Only)",
                             data=buffer.getvalue(),
-                            file_name=f"duplicates_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                            file_name=f"duplicates_masters_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
                             mime="application/vnd.ms-excel"
                         )
                     except Exception as e2:
@@ -825,7 +1036,42 @@ if uploaded:
         with col2:
             if st.button("Export to CSV"):
                 try:
-                    csv = dup_df.to_csv(index=False)
+                    # Create a flattened version of the data for export
+                    export_rows = []
+                    for _, master in dup_df.iterrows():
+                        # Add master record
+                        master_row = {
+                            "RecordType": "Master",
+                            "MasterRow": master["MasterRow"],
+                            "MasterName": master["MasterName"],
+                            "MasterAddress": master["MasterAddress"],
+                            "DuplicateCount": master["DuplicateCount"],
+                            "AvgSimilarity": master["AvgSimilarity"],
+                            "NeedsAI": "Yes" if master["NeedsAI"] else "No"
+                        }
+                        export_rows.append(master_row)
+                        
+                        # Add duplicate records
+                        for dup in master["Duplicates"]:
+                            dup_row = {
+                                "RecordType": "Duplicate",
+                                "MasterRow": master["MasterRow"],
+                                "MasterName": master["MasterName"],
+                                "DuplicateRow": dup["Row"],
+                                "DuplicateName": dup["Name"],
+                                "DuplicateAddress": dup["Address"],
+                                "Name%": dup["Name%"],
+                                "Addr%": dup["Addr%"],
+                                "Overall%": dup["Overall%"],
+                                "NeedsAI": "Yes" if dup["NeedsAI"] else "No",
+                                "LLM_conf": dup["LLM_conf"] if dup["LLM_conf"] is not None else ""
+                            }
+                            export_rows.append(dup_row)
+                    
+                    # Create export DataFrame
+                    export_df = pd.DataFrame(export_rows)
+                    csv = export_df.to_csv(index=False)
+                    
                     st.download_button(
                         label="Download CSV",
                         data=csv,
