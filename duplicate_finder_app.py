@@ -268,22 +268,26 @@ def diff_html(a: str, b: str) -> str:
 # Placeholder AI helpers
 # ---------------------------------------------------------------------------
 
-def ask_llm_batch(rows: List[dict]) -> List[float]:
+def ask_llm_batch(rows: List[dict]) -> tuple[List[float], str | None]:
     """
     Sends a batch of duplicate-pair dicts to OpenAI and
-    returns a list of confidence scores (floats 0-1).
+    returns a tuple containing:
+    1. A list of confidence scores (floats 0-1)
+    2. A 2-sentence summary of the analysis (or None if failed)
 
-    • If the call fails, None is returned for each row so the UI can handle it.
+    • If the call fails, (None list, None) is returned so the UI can handle it properly.
     """
     if not rows:
-        return []
+        return [], None
 
     # ---- Build prompt ----------------------------------------------------
     system_msg = (
         "You are a data-quality assistant. For each pair of customer records "
-        "in the JSON list provided by the user, respond ONLY with a JSON array "
-        "of floating-point numbers (0-1) representing the probability that the "
-        "pair refers to the same underlying customer. Maintain the same order."
+        "in the JSON list provided by the user, analyze the similarity and respond with:\n"
+        "1. A JSON array of floating-point numbers (0-1) representing the probability that each "
+        "pair refers to the same underlying customer. Maintain the same order.\n"
+        "2. After the JSON array, provide a 2-sentence summary of your analysis. The first sentence "
+        "should describe your task, and the second should summarize your examination of the data."
     )
     user_msg = json.dumps(rows, indent=2)
 
@@ -296,17 +300,33 @@ def ask_llm_batch(rows: List[dict]) -> List[float]:
                 {"role": "user", "content": user_msg},
             ],
             temperature=0.0,
-            max_tokens=300,
+            max_tokens=500,  # Increased to accommodate summary
         )
         
         # Extract content from the response
         content = response.choices[0].message.content
-        scores = json.loads(content)
-        return [float(s) for s in scores]
+        
+        # Parse the response - extract JSON array and summary
+        # Find the first JSON array in the response
+        import re
+        json_match = re.search(r'\[.*?\]', content, re.DOTALL)
+        
+        if not json_match:
+            raise ValueError("Could not find JSON array in response")
+            
+        scores_json = json_match.group(0)
+        scores = json.loads(scores_json)
+        
+        # Extract the summary (everything after the JSON array)
+        summary_text = content[json_match.end():].strip()
+        if not summary_text:
+            summary_text = "Analysis complete. Confidence scores generated based on name and address similarity."
+            
+        return [float(s) for s in scores], summary_text
 
     except Exception as e:
         st.error(f"LLM batch call failed: {e}")
-        return [None] * len(rows)
+        return [None] * len(rows), None
 
 
 
@@ -757,23 +777,63 @@ if uploaded:
                                 })
                                 break
                     
-                    scores = ask_llm_batch(ai_rows)
+                    scores, summary = ask_llm_batch(ai_rows)
 
-                    progress_bar.progress(70, text="Processing AI results...")
-                    
-                    # Update LLM_conf in the duplicates lists
-                    score_map = {r["uid"]: s for r, s in zip(ai_rows, scores)}
-                    
-                    # Update the duplicates in each master record
-                    for i, master in dup_df.iterrows():
-                        for j, dup in enumerate(master["Duplicates"]):
-                            if dup["uid"] in score_map:
-                                dup_df.at[i, "Duplicates"][j]["LLM_conf"] = score_map[dup["uid"]]
-                    
-                    progress_bar.progress(100, text="AI analysis complete!")
-                    st.session_state["dup_df"] = dup_df
-
-                    status_placeholder.success("AI analysis complete. LLM confidence scores updated.")
+                    # Check if the LLM call was successful
+                    if scores[0] is None or summary is None:
+                        # LLM call failed, show error
+                        status_placeholder.error("AI analysis failed. No confidence scores were updated.")
+                    else:
+                        progress_bar.progress(70, text="Processing AI results...")
+                        
+                        # Update LLM_conf in the duplicates lists
+                        score_map = {r["uid"]: s for r, s in zip(ai_rows, scores)}
+                        
+                        # Update the duplicates in each master record
+                        for i, master in dup_df.iterrows():
+                            for j, dup in enumerate(master["Duplicates"]):
+                                if dup["uid"] in score_map:
+                                    dup_df.at[i, "Duplicates"][j]["LLM_conf"] = score_map[dup["uid"]]
+                        
+                        progress_bar.progress(100, text="AI analysis complete!")
+                        st.session_state["dup_df"] = dup_df
+                        
+                        # Clear the status placeholder to make room for our nicely formatted results
+                        status_placeholder.empty()
+                        
+                        # Create a visually appealing results section with clear hierarchy
+                        with st.container():
+                            # Main success header
+                            st.markdown("""
+                            <div style="background-color:#d4edda; color:#155724; padding:10px; border-radius:5px; margin-bottom:15px;">
+                                <h3 style="margin:0; padding:0;">✅ AI Analysis Complete</h3>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Results container with sections
+                            st.markdown("""
+                            <div style="background-color:#1e1e2e; border-radius:8px; padding:15px; margin-bottom:20px; border:1px solid #4e4e4e;">
+                                <h4 style="color:#4e8df5; margin-top:0;">Analysis Results</h4>
+                                <div style="display:flex; margin-bottom:10px;">
+                                    <div style="background-color:#262730; flex:1; padding:10px; border-radius:5px; margin-right:10px;">
+                                        <p style="color:#aaa; margin:0; font-size:0.8em;">PROCESSED</p>
+                                        <p style="margin:0; font-size:1.2em;">{} records</p>
+                                    </div>
+                                    <div style="background-color:#262730; flex:1; padding:10px; border-radius:5px;">
+                                        <p style="color:#aaa; margin:0; font-size:0.8em;">UPDATED</p>
+                                        <p style="margin:0; font-size:1.2em;">{} confidence scores</p>
+                                    </div>
+                                </div>
+                            """.format(len(ai_rows), len([s for s in scores if s is not None])), unsafe_allow_html=True)
+                            
+                            # Summary section with visual separation
+                            st.markdown("""
+                                <h4 style="color:#4e8df5; margin-top:15px;">AI Synopsis</h4>
+                                <div style="background-color:#262730; padding:15px; border-radius:5px; border-left:4px solid #4e8df5;">
+                                    <p style="margin:0;">{}</p>
+                                </div>
+                            </div>
+                            """.format(summary), unsafe_allow_html=True)
                 except Exception as e:
                     status_placeholder.error(f"AI analysis failed: {str(e)}")
 
