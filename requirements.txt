@@ -3,6 +3,7 @@ pandas
 charset-normalizer
 python-dateutil
 pathlib
+python-dotenv        # for loading environment variables
 
 thefuzz[speedup]     # pulls python-levenshtein
 neofuzz              # optional, faster fuzzy
