@@ -4,6 +4,7 @@ charset-normalizer
 python-dateutil
 pathlib
 python-dotenv        # for loading environment variables
+markdown
 
 thefuzz[speedup]     # pulls python-levenshtein
 neofuzz              # optional, faster fuzzy
