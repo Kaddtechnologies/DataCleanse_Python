@@ -776,78 +776,214 @@ if uploaded:
                                         st.session_state["dup_df"] = dup_df
                 
                 elif clicked_column == "View":
-                    # Show a popup with detailed comparison view
+                    # Show a comprehensive comparison view with enhanced visual cues
                     master_row = dup_df.iloc[clicked_row]
                     duplicates = master_row["Duplicates"]
                     
                     if duplicates:
                         with st.container():
+                            # Header with visual styling
                             st.markdown(f"""
-                            <div style="background-color:#1e1e2e; border-radius:8px; padding:15px; margin:15px 0; border:1px solid #4e8df5;">
-                                <h4 style="color:#4e8df5; margin-top:0;">Detailed Comparison View</h4>
+                            <div style="background-color:#1e1e2e; border-radius:8px; padding:20px; margin:15px 0; border:1px solid #4e8df5; box-shadow:0 4px 8px rgba(0,0,0,0.2);">
+                                <h3 style="color:#4e8df5; margin:0; text-align:center;">Comprehensive Comparison View</h3>
+                                <p style="color:#aaa; text-align:center; margin:5px 0 0 0;">Master Record vs. Potential Duplicates</p>
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # Master record details
-                            st.markdown(f"""
-                            <div style="background-color:#262730; padding:15px; border-radius:5px; margin-bottom:15px;">
-                                <h5 style="margin-top:0; color:#4e8df5;">Master Record (Row {master_row['MasterRow']})</h5>
-                                <p><strong>Name:</strong> {master_row['MasterName']}</p>
-                                <p><strong>Address:</strong> {master_row['MasterAddress']}</p>
+                            # Create a legend for visual cues
+                            st.markdown("""
+                            <div style="display:flex; justify-content:center; margin:15px 0; flex-wrap:wrap; gap:10px;">
+                                <div style="display:flex; align-items:center; margin-right:15px;">
+                                    <div style="width:12px; height:12px; background-color:#d4edda; border-radius:2px; margin-right:5px;"></div>
+                                    <span style="font-size:0.8em; color:#aaa;">Added Content</span>
+                                </div>
+                                <div style="display:flex; align-items:center; margin-right:15px;">
+                                    <div style="width:12px; height:12px; background-color:#fff3cd; border-radius:2px; margin-right:5px;"></div>
+                                    <span style="font-size:0.8em; color:#aaa;">Removed Content</span>
+                                </div>
+                                <div style="display:flex; align-items:center; margin-right:15px;">
+                                    <div style="width:12px; height:12px; background-color:#28a745; border-radius:2px; margin-right:5px;"></div>
+                                    <span style="font-size:0.8em; color:#aaa;">High Confidence (>80%)</span>
+                                </div>
+                                <div style="display:flex; align-items:center; margin-right:15px;">
+                                    <div style="width:12px; height:12px; background-color:#ffc107; border-radius:2px; margin-right:5px;"></div>
+                                    <span style="font-size:0.8em; color:#aaa;">Medium Confidence (50-80%)</span>
+                                </div>
+                                <div style="display:flex; align-items:center;">
+                                    <div style="width:12px; height:12px; background-color:#dc3545; border-radius:2px; margin-right:5px;"></div>
+                                    <span style="font-size:0.8em; color:#aaa;">Low Confidence (<50%)</span>
+                                </div>
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # Create comparison cards for each duplicate
+                            # Master record card with enhanced styling
+                            st.markdown(f"""
+                            <div style="background-color:#262730; padding:20px; border-radius:8px; margin-bottom:25px; box-shadow:0 4px 6px rgba(0,0,0,0.1); border:1px solid #4e4e4e;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #4e4e4e; padding-bottom:10px;">
+                                    <h4 style="margin:0; color:#4e8df5;">Master Record</h4>
+                                    <div style="background-color:#4e8df5; color:white; padding:3px 10px; border-radius:15px; font-size:0.8em;">
+                                        Row {master_row['MasterRow']}
+                                    </div>
+                                </div>
+                                
+                                <div style="margin-bottom:15px;">
+                                    <div style="display:flex; margin-bottom:5px;">
+                                        <div style="width:100px; color:#aaa; font-size:0.9em;">Name:</div>
+                                        <div style="flex:1; font-weight:500; background-color:#1e1e2e; padding:8px; border-radius:4px; word-break:break-word;">{master_row['MasterName']}</div>
+                                    </div>
+                                    <div style="display:flex; margin-top:10px;">
+                                        <div style="width:100px; color:#aaa; font-size:0.9em;">Address:</div>
+                                        <div style="flex:1; font-weight:500; background-color:#1e1e2e; padding:8px; border-radius:4px; word-break:break-word;">{master_row['MasterAddress']}</div>
+                                    </div>
+                                </div>
+                                
+                                <div style="display:flex; justify-content:space-between; background-color:#1e1e2e; padding:10px; border-radius:4px;">
+                                    <div style="text-align:center;">
+                                        <div style="color:#aaa; font-size:0.8em;">DUPLICATES</div>
+                                        <div style="font-size:1.2em; font-weight:500;">{master_row['DuplicateCount']}</div>
+                                    </div>
+                                    <div style="text-align:center;">
+                                        <div style="color:#aaa; font-size:0.8em;">AVG SIMILARITY</div>
+                                        <div style="font-size:1.2em; font-weight:500;">{master_row['AvgSimilarity']}%</div>
+                                    </div>
+                                    <div style="text-align:center;">
+                                        <div style="color:#aaa; font-size:0.8em;">NEEDS AI</div>
+                                        <div style="font-size:1.2em; font-weight:500;">{master_row['NeedsAI'] and '🤖 Yes' or '✓ No'}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Create enhanced comparison cards for each duplicate
                             for i, dup in enumerate(duplicates):
                                 # Calculate confidence indicator color
                                 if dup.get("LLM_conf"):
-                                    conf_color = "#28a745" if dup["LLM_conf"] > 0.8 else "#ffc107" if dup["LLM_conf"] > 0.5 else "#dc3545"
-                                    conf_text = f"{dup['LLM_conf']:.2f}"
+                                    conf_value = dup["LLM_conf"]
+                                    conf_color = "#28a745" if conf_value > 0.8 else "#ffc107" if conf_value > 0.5 else "#dc3545"
+                                    conf_text = f"{conf_value:.2f}"
+                                    conf_label = "High" if conf_value > 0.8 else "Medium" if conf_value > 0.5 else "Low"
                                 else:
                                     conf_color = "#6c757d"
                                     conf_text = "N/A"
+                                    conf_label = "Unknown"
                                 
+                                # Calculate similarity indicator colors
+                                name_color = "#28a745" if dup["Name%"] >= 90 else "#ffc107" if dup["Name%"] >= 75 else "#dc3545"
+                                addr_color = "#28a745" if dup["Addr%"] >= 90 else "#ffc107" if dup["Addr%"] >= 75 else "#dc3545"
+                                overall_color = "#28a745" if dup["Overall%"] >= 90 else "#ffc107" if dup["Overall%"] >= 75 else "#dc3545"
+                                
+                                # Create side-by-side comparison card
                                 st.markdown(f"""
-                                <div style="background-color:#262730; padding:15px; border-radius:5px; margin-bottom:10px; border-left:4px solid {conf_color};">
-                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                                        <h5 style="margin:0; color:#4e8df5;">Duplicate #{i+1} (Row {dup['Row']})</h5>
-                                        <div style="background-color:{conf_color}; color:white; padding:3px 8px; border-radius:10px; font-size:0.8em;">
-                                            AI Conf: {conf_text}
+                                <div style="background-color:#262730; padding:20px; border-radius:8px; margin-bottom:20px; box-shadow:0 4px 6px rgba(0,0,0,0.1); border-left:4px solid {conf_color};">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #4e4e4e; padding-bottom:10px;">
+                                        <h4 style="margin:0; color:#4e8df5;">Duplicate #{i+1}</h4>
+                                        <div style="display:flex; align-items:center;">
+                                            <div style="background-color:{overall_color}; color:white; padding:3px 10px; border-radius:15px; font-size:0.8em; margin-right:10px;">
+                                                Overall: {dup['Overall%']}%
+                                            </div>
+                                            <div style="background-color:{conf_color}; color:white; padding:3px 10px; border-radius:15px; font-size:0.8em;">
+                                                AI: {conf_text} ({conf_label})
+                                            </div>
                                         </div>
                                     </div>
                                     
-                                    <div style="display:flex; margin-bottom:10px;">
-                                        <div style="flex:1; margin-right:10px;">
-                                            <p style="color:#aaa; margin:0; font-size:0.8em;">NAME SIMILARITY</p>
-                                            <p style="margin:0; font-size:1.2em;">{dup['Name%']}%</p>
+                                    <!-- Similarity metrics with visual indicators -->
+                                    <div style="display:flex; margin-bottom:20px; gap:10px;">
+                                        <div style="flex:1; background-color:#1e1e2e; padding:10px; border-radius:6px; border-left:3px solid {name_color};">
+                                            <div style="color:#aaa; font-size:0.8em; margin-bottom:5px;">NAME SIMILARITY</div>
+                                            <div style="font-size:1.2em; font-weight:500;">{dup['Name%']}%</div>
+                                            <div style="height:5px; width:100%; background-color:#4e4e4e; border-radius:3px; margin-top:5px;">
+                                                <div style="height:5px; width:{dup['Name%']}%; background-color:{name_color}; border-radius:3px;"></div>
+                                            </div>
                                         </div>
-                                        <div style="flex:1; margin-right:10px;">
-                                            <p style="color:#aaa; margin:0; font-size:0.8em;">ADDRESS SIMILARITY</p>
-                                            <p style="margin:0; font-size:1.2em;">{dup['Addr%']}%</p>
+                                        <div style="flex:1; background-color:#1e1e2e; padding:10px; border-radius:6px; border-left:3px solid {addr_color};">
+                                            <div style="color:#aaa; font-size:0.8em; margin-bottom:5px;">ADDRESS SIMILARITY</div>
+                                            <div style="font-size:1.2em; font-weight:500;">{dup['Addr%']}%</div>
+                                            <div style="height:5px; width:100%; background-color:#4e4e4e; border-radius:3px; margin-top:5px;">
+                                                <div style="height:5px; width:{dup['Addr%']}%; background-color:{addr_color}; border-radius:3px;"></div>
+                                            </div>
                                         </div>
-                                        <div style="flex:1;">
-                                            <p style="color:#aaa; margin:0; font-size:0.8em;">OVERALL</p>
-                                            <p style="margin:0; font-size:1.2em;">{dup['Overall%']}%</p>
-                                        </div>
-                                    </div>
-                                    
-                                    <div>
-                                        <p><strong>Name:</strong> {dup['Name']}</p>
-                                        <p><strong>Address:</strong> {dup['Address']}</p>
-                                    </div>
-                                    
-                                    <div style="margin-top:10px;">
-                                        <p style="color:#aaa; font-size:0.9em;">Name Diff:</p>
-                                        <div style="background-color:#1e1e2e; padding:8px; border-radius:5px; font-family:monospace;">
-                                            {diff_html(master_row['MasterName'], dup['Name'])}
+                                        <div style="flex:1; background-color:#1e1e2e; padding:10px; border-radius:6px; border-left:3px solid {overall_color};">
+                                            <div style="color:#aaa; font-size:0.8em; margin-bottom:5px;">OVERALL MATCH</div>
+                                            <div style="font-size:1.2em; font-weight:500;">{dup['Overall%']}%</div>
+                                            <div style="height:5px; width:100%; background-color:#4e4e4e; border-radius:3px; margin-top:5px;">
+                                                <div style="height:5px; width:{dup['Overall%']}%; background-color:{overall_color}; border-radius:3px;"></div>
+                                            </div>
                                         </div>
                                     </div>
                                     
-                                    <div style="margin-top:10px;">
-                                        <p style="color:#aaa; font-size:0.9em;">Address Diff:</p>
-                                        <div style="background-color:#1e1e2e; padding:8px; border-radius:5px; font-family:monospace;">
-                                            {diff_html(master_row['MasterAddress'], dup['Address'])}
+                                    <!-- Side-by-side comparison with clear visual separation -->
+                                    <div style="display:flex; margin-bottom:15px; gap:15px;">
+                                        <!-- Master data column -->
+                                        <div style="flex:1; background-color:#1e1e2e; padding:15px; border-radius:6px;">
+                                            <div style="color:#4e8df5; font-size:0.9em; margin-bottom:10px; text-align:center; font-weight:500;">MASTER RECORD</div>
+                                            
+                                            <div style="margin-bottom:15px;">
+                                                <div style="color:#aaa; font-size:0.8em; margin-bottom:3px;">Name:</div>
+                                                <div style="background-color:#262730; padding:8px; border-radius:4px; word-break:break-word;">{master_row['MasterName']}</div>
+                                            </div>
+                                            
+                                            <div>
+                                                <div style="color:#aaa; font-size:0.8em; margin-bottom:3px;">Address:</div>
+                                                <div style="background-color:#262730; padding:8px; border-radius:4px; word-break:break-word;">{master_row['MasterAddress']}</div>
+                                            </div>
                                         </div>
+                                        
+                                        <!-- Comparison arrows column -->
+                                        <div style="display:flex; flex-direction:column; justify-content:center; align-items:center; width:50px;">
+                                            <div style="color:#aaa; font-size:1.5em; margin-bottom:20px;">⟷</div>
+                                            <div style="color:#aaa; font-size:1.5em; margin-top:20px;">⟷</div>
+                                        </div>
+                                        
+                                        <!-- Duplicate data column -->
+                                        <div style="flex:1; background-color:#1e1e2e; padding:15px; border-radius:6px;">
+                                            <div style="color:#4e8df5; font-size:0.9em; margin-bottom:10px; text-align:center; font-weight:500;">DUPLICATE RECORD (Row {dup['Row']})</div>
+                                            
+                                            <div style="margin-bottom:15px;">
+                                                <div style="color:#aaa; font-size:0.8em; margin-bottom:3px;">Name:</div>
+                                                <div style="background-color:#262730; padding:8px; border-radius:4px; word-break:break-word;">{dup['Name']}</div>
+                                            </div>
+                                            
+                                            <div>
+                                                <div style="color:#aaa; font-size:0.8em; margin-bottom:3px;">Address:</div>
+                                                <div style="background-color:#262730; padding:8px; border-radius:4px; word-break:break-word;">{dup['Address']}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Detailed diff visualization with enhanced styling -->
+                                    <div style="margin-top:20px;">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                            <div style="color:#aaa; font-size:0.9em; font-weight:500;">DETAILED DIFFERENCES</div>
+                                            <div style="font-size:0.8em; color:#aaa;">Green: added | Yellow: removed</div>
+                                        </div>
+                                        
+                                        <div style="background-color:#1e1e2e; padding:15px; border-radius:6px; margin-bottom:10px;">
+                                            <div style="color:#aaa; font-size:0.8em; margin-bottom:5px;">Name Comparison:</div>
+                                            <div style="background-color:#262730; padding:10px; border-radius:4px; font-family:monospace; line-height:1.5; overflow-x:auto;">
+                                                {diff_html(master_row['MasterName'], dup['Name'])}
+                                            </div>
+                                        </div>
+                                        
+                                        <div style="background-color:#1e1e2e; padding:15px; border-radius:6px;">
+                                            <div style="color:#aaa; font-size:0.8em; margin-bottom:5px;">Address Comparison:</div>
+                                            <div style="background-color:#262730; padding:10px; border-radius:4px; font-family:monospace; line-height:1.5; overflow-x:auto;">
+                                                {diff_html(master_row['MasterAddress'], dup['Address'])}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Decision buttons -->
+                                    <div style="display:flex; justify-content:space-between; margin-top:20px; gap:10px;">
+                                        <button style="flex:1; background-color:#28a745; color:white; border:none; padding:8px 0; border-radius:4px; cursor:pointer; font-weight:500;">
+                                            Confirm Match
+                                        </button>
+                                        <button style="flex:1; background-color:#ffc107; color:#212529; border:none; padding:8px 0; border-radius:4px; cursor:pointer; font-weight:500;">
+                                            Needs Review
+                                        </button>
+                                        <button style="flex:1; background-color:#dc3545; color:white; border:none; padding:8px 0; border-radius:4px; cursor:pointer; font-weight:500;">
+                                            Not a Match
+                                        </button>
                                     </div>
                                 </div>
                                 """, unsafe_allow_html=True)
@@ -907,8 +1043,7 @@ if uploaded:
             # Show which rows are being processed
             if selected_indices:
                 status_placeholder.info(f"Processing {len(selected_indices)} selected rows with {len(all_duplicates)} potential duplicates")
-            
-            target_rows = all_duplicates
+                target_rows = all_duplicates
             else:
                 # Process all masters that need AI
                 masters_needing_ai = dup_df[dup_df["NeedsAI"] == True]
@@ -1077,119 +1212,324 @@ if uploaded:
             decisions_made = len(st.session_state.get("card_decisions", {}))
             progress_pct = int((decisions_made / total_pairs) * 100) if total_pairs > 0 else 0
             
-            # Progress metrics
-            st.progress(progress_pct/100, f"Progress: {progress_pct}% ({decisions_made}/{total_pairs} pairs reviewed)")
-            
-            # Card navigation
+            # Get the current card's decision status if it exists
             idx = st.session_state["card_idx"] % len(med_df)
             row = med_df.loc[idx]
             pair_id = row["uid"]
+            current_decision = st.session_state["card_decisions"].get(pair_id, None)
             
-            # Card container with styling
+            # Determine status color based on decision
+            status_color = "#6c757d"  # Default gray
+            status_text = "Pending Review"
+            if current_decision == "left":
+                status_color = "#28a745"  # Green
+                status_text = "Keep Left"
+            elif current_decision == "right":
+                status_color = "#17a2b8"  # Blue
+                status_text = "Keep Right"
+            elif current_decision == "both":
+                status_color = "#ffc107"  # Yellow
+                status_text = "Keep Both"
+            
+            # Progress metrics with enhanced styling
+            st.markdown(f"""
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <div style="background-color:#262730; padding:10px 15px; border-radius:5px; flex:1; margin-right:10px;">
+                    <div style="color:#aaa; font-size:0.8em; margin-bottom:3px;">PROGRESS</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div style="font-size:1.1em; font-weight:500;">{progress_pct}%</div>
+                        <div style="color:#aaa; font-size:0.9em;">{decisions_made}/{total_pairs} reviewed</div>
+                    </div>
+                    <div style="height:5px; width:100%; background-color:#4e4e4e; border-radius:3px; margin-top:5px;">
+                        <div style="height:5px; width:{progress_pct}%; background-color:#4e8df5; border-radius:3px;"></div>
+                    </div>
+                </div>
+                
+                <div style="background-color:#262730; padding:10px 15px; border-radius:5px; flex:1; margin-right:10px;">
+                    <div style="color:#aaa; font-size:0.8em; margin-bottom:3px;">CURRENT PAIR</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div style="font-size:1.1em; font-weight:500;">{idx+1} of {len(med_df)}</div>
+                        <div style="background-color:{status_color}; color:white; padding:2px 8px; border-radius:10px; font-size:0.8em;">{status_text}</div>
+                    </div>
+                </div>
+                
+                <div style="background-color:#262730; padding:10px 15px; border-radius:5px; flex:1;">
+                    <div style="color:#aaa; font-size:0.8em; margin-bottom:3px;">MATCH CONFIDENCE</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div style="font-size:1.1em; font-weight:500;">{row['Overall%']}%</div>
+                        <div style="display:flex; align-items:center;">
+                            <div style="width:8px; height:8px; border-radius:50%; background-color:{'#28a745' if row['Name%'] >= 95 else '#ffc107' if row['Name%'] >= 85 else '#dc3545'}; margin-right:5px;"></div>
+                            <div style="color:#aaa; font-size:0.8em;">Name: {row['Name%']}%</div>
+                        </div>
+                        <div style="display:flex; align-items:center; margin-left:10px;">
+                            <div style="width:8px; height:8px; border-radius:50%; background-color:{'#28a745' if row['Addr%'] >= 95 else '#ffc107' if row['Addr%'] >= 85 else '#dc3545'}; margin-right:5px;"></div>
+                            <div style="color:#aaa; font-size:0.8em;">Addr: {row['Addr%']}%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Main flash card with optimized layout
             with st.container():
+                # Card header with status indicator
                 st.markdown(f"""
-                <div style="padding: 20px; border-radius: 10px; border: 1px solid #4e4e4e;
-                            box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px;
-                            background-color: #1e1e1e;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-                        <h3 style="margin: 0;">Pair {idx+1} of {len(med_df)}</h3>
-                        <span style="background-color: #4e8df5; color: white; padding: 3px 10px;
-                                border-radius: 20px; font-weight: bold;">
-                            {row['Overall%']}% Match
-                        </span>
+                <div style="padding:20px; border-radius:10px; border:1px solid {status_color};
+                            box-shadow:0 4px 8px rgba(0,0,0,0.15); margin-bottom:15px;
+                            background-color:#1e1e2e;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;
+                                border-bottom:1px solid #4e4e4e; padding-bottom:10px; margin-bottom:15px;">
+                        <h3 style="margin:0; color:#fff;">Customer Comparison</h3>
+                        <div style="display:flex; align-items:center;">
+                            <div style="background-color:{status_color}; width:10px; height:10px; border-radius:50%; margin-right:8px;"></div>
+                            <span style="color:#aaa;">{status_text}</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Tabbed interface for different views -->
+                    <div class="flash-card-tabs">
+                        <div style="display:flex; border-bottom:1px solid #4e4e4e; margin-bottom:15px;">
+                            <div id="tab-diff" style="padding:8px 15px; cursor:pointer; border-bottom:2px solid #4e8df5; color:#4e8df5; font-weight:500;">Differences</div>
+                            <div id="tab-side" style="padding:8px 15px; cursor:pointer; color:#aaa;">Side by Side</div>
+                            <div id="tab-details" style="padding:8px 15px; cursor:pointer; color:#aaa;">Full Details</div>
+                        </div>
+                        
+                        <!-- Tab content - Differences View (default) -->
+                        <div id="content-diff" style="display:block;">
+                            <div style="margin-bottom:20px;">
+                                <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                                    <div style="font-weight:500; color:#4e8df5;">Customer Name</div>
+                                    <div style="color:#aaa; font-size:0.9em;">Match: {row['Name%']}%</div>
+                                </div>
+                                <div style="background-color:#262730; padding:12px; border-radius:5px; font-family:monospace; line-height:1.5;">
+                                    {diff_html(row["MasterName"], row["DuplicateName"])}
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                                    <div style="font-weight:500; color:#4e8df5;">Address</div>
+                                    <div style="color:#aaa; font-size:0.9em;">Match: {row['Addr%']}%</div>
+                                </div>
+                                <div style="background-color:#262730; padding:12px; border-radius:5px; font-family:monospace; line-height:1.5;">
+                                    {diff_html(row["MasterAddress"], row["DuplicateAddress"])}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Tab content - Side by Side View (hidden by default) -->
+                        <div id="content-side" style="display:none;">
+                            <div style="display:flex; gap:15px; margin-bottom:15px;">
+                                <div style="flex:1; background-color:#262730; padding:15px; border-radius:5px;">
+                                    <div style="color:#4e8df5; font-size:0.9em; margin-bottom:10px; font-weight:500; text-align:center;">MASTER RECORD (Row {row['MasterRow']})</div>
+                                    <div style="margin-bottom:15px;">
+                                        <div style="color:#aaa; font-size:0.8em; margin-bottom:3px;">Name:</div>
+                                        <div style="background-color:#1e1e2e; padding:8px; border-radius:4px; word-break:break-word;">{row['MasterName']}</div>
+                                    </div>
+                                    <div>
+                                        <div style="color:#aaa; font-size:0.8em; margin-bottom:3px;">Address:</div>
+                                        <div style="background-color:#1e1e2e; padding:8px; border-radius:4px; word-break:break-word;">{row['MasterAddress']}</div>
+                                    </div>
+                                </div>
+                                
+                                <div style="flex:1; background-color:#262730; padding:15px; border-radius:5px;">
+                                    <div style="color:#4e8df5; font-size:0.9em; margin-bottom:10px; font-weight:500; text-align:center;">DUPLICATE RECORD (Row {row['DuplicateRow']})</div>
+                                    <div style="margin-bottom:15px;">
+                                        <div style="color:#aaa; font-size:0.8em; margin-bottom:3px;">Name:</div>
+                                        <div style="background-color:#1e1e2e; padding:8px; border-radius:4px; word-break:break-word;">{row['DuplicateName']}</div>
+                                    </div>
+                                    <div>
+                                        <div style="color:#aaa; font-size:0.8em; margin-bottom:3px;">Address:</div>
+                                        <div style="background-color:#1e1e2e; padding:8px; border-radius:4px; word-break:break-word;">{row['DuplicateAddress']}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Tab content - Full Details View (hidden by default) -->
+                        <div id="content-details" style="display:none;">
+                            <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:15px;">
+                                <div style="flex:1; min-width:200px; background-color:#262730; padding:12px; border-radius:5px;">
+                                    <div style="color:#aaa; font-size:0.8em; margin-bottom:3px;">Master Row</div>
+                                    <div style="font-size:1.1em;">{row['MasterRow']}</div>
+                                </div>
+                                <div style="flex:1; min-width:200px; background-color:#262730; padding:12px; border-radius:5px;">
+                                    <div style="color:#aaa; font-size:0.8em; margin-bottom:3px;">Duplicate Row</div>
+                                    <div style="font-size:1.1em;">{row['DuplicateRow']}</div>
+                                </div>
+                                <div style="flex:1; min-width:200px; background-color:#262730; padding:12px; border-radius:5px;">
+                                    <div style="color:#aaa; font-size:0.8em; margin-bottom:3px;">Name Match</div>
+                                    <div style="font-size:1.1em;">{row['Name%']}%</div>
+                                </div>
+                                <div style="flex:1; min-width:200px; background-color:#262730; padding:12px; border-radius:5px;">
+                                    <div style="color:#aaa; font-size:0.8em; margin-bottom:3px;">Address Match</div>
+                                    <div style="font-size:1.1em;">{row['Addr%']}%</div>
+                                </div>
+                                <div style="flex:1; min-width:200px; background-color:#262730; padding:12px; border-radius:5px;">
+                                    <div style="color:#aaa; font-size:0.8em; margin-bottom:3px;">Overall Match</div>
+                                    <div style="font-size:1.1em;">{row['Overall%']}%</div>
+                                </div>
+                                <div style="flex:1; min-width:200px; background-color:#262730; padding:12px; border-radius:5px;">
+                                    <div style="color:#aaa; font-size:0.8em; margin-bottom:3px;">Pair ID</div>
+                                    <div style="font-size:0.9em; word-break:break-all;">{row['uid']}</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Create two columns for comparison
-                col1, col2 = st.columns(2)
+                # Decision and navigation controls in a fixed-position footer
+                st.markdown("""
+                <div style="background-color:#262730; padding:15px; border-radius:5px; margin-bottom:20px; position:sticky; bottom:0;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                        <h4 style="margin:0; color:#4e8df5;">Make a Decision</h4>
+                        <div style="color:#aaa; font-size:0.9em;">Use keyboard shortcuts: L, R, B, S</div>
+                    </div>
+                    
+                    <div style="display:flex; gap:10px; margin-bottom:15px;">
+                        <button id="btn-keep-left" style="flex:1; background-color:#28a745; color:white; border:none; padding:10px 0; border-radius:4px; cursor:pointer; font-weight:500;">
+                            👈 Keep Left (L)
+                        </button>
+                        <button id="btn-keep-right" style="flex:1; background-color:#17a2b8; color:white; border:none; padding:10px 0; border-radius:4px; cursor:pointer; font-weight:500;">
+                            👉 Keep Right (R)
+                        </button>
+                        <button id="btn-keep-both" style="flex:1; background-color:#ffc107; color:#212529; border:none; padding:10px 0; border-radius:4px; cursor:pointer; font-weight:500;">
+                            🔄 Keep Both (B)
+                        </button>
+                    </div>
+                    
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <button id="btn-prev" style="background-color:#6c757d; color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer;">
+                            ⬅️ Prev
+                        </button>
+                        <button id="btn-skip" style="background-color:#6c757d; color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer; min-width:120px; text-align:center;">
+                            ⏭️ Skip (S)
+                        </button>
+                        <button id="btn-next" style="background-color:#6c757d; color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer;">
+                            ➡️ Next
+                        </button>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
                 
-                # Left column - Record details
-                with col1:
-                    st.markdown("<div style='background-color:#262730; padding:15px; border-radius:5px; margin-bottom:15px;'>", unsafe_allow_html=True)
-                    st.markdown("<h4>Customer Name</h4>", unsafe_allow_html=True)
-                    st.markdown(diff_html(row["MasterName"], row["DuplicateName"]), unsafe_allow_html=True)
-                    
-                    st.markdown("<h4 style='margin-top:15px;'>Address</h4>", unsafe_allow_html=True)
-                    st.markdown(diff_html(row["MasterAddress"], row["DuplicateAddress"]), unsafe_allow_html=True)
-                    
-                    # Add more details if available
-                    st.markdown("<h4 style='margin-top:15px;'>Record Details</h4>", unsafe_allow_html=True)
-                    st.markdown(f"""
-                    <table style="width:100%; border-collapse: collapse;">
-                        <tr>
-                            <td style="padding:5px; border-bottom:1px solid #4e4e4e; width:50%;">Master Record (Row {row['MasterRow']})</td>
-                            <td style="padding:5px; border-bottom:1px solid #4e4e4e; width:50%;">Duplicate Record (Row {row['DuplicateRow']})</td>
-                        </tr>
-                        <tr>
-                            <td style="padding:5px; color:#aaa;">Name Match: {row['Name%']}%</td>
-                            <td style="padding:5px; color:#aaa;">Address Match: {row['Addr%']}%</td>
-                        </tr>
-                    </table>
-                    """, unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
+                # Hidden buttons that will be triggered by the custom UI
+                if st.button("Keep Left", key="keep_left", help="Keep the left record (Master)", type="primary", use_container_width=True):
+                    st.session_state["card_decisions"][pair_id] = "left"
+                    st.session_state["card_idx"] += 1
+                    st.experimental_rerun()
                 
-                # Right column - Decision buttons
-                with col2:
-                    st.markdown("<div style='background-color:#262730; padding:15px; border-radius:5px;'>", unsafe_allow_html=True)
-                    st.markdown("<h4>Make a Decision</h4>", unsafe_allow_html=True)
+                if st.button("Keep Right", key="keep_right", help="Keep the right record (Duplicate)", type="primary", use_container_width=True):
+                    st.session_state["card_decisions"][pair_id] = "right"
+                    st.session_state["card_idx"] += 1
+                    st.experimental_rerun()
+                
+                if st.button("Keep Both", key="keep_both", help="Keep both records", type="primary", use_container_width=True):
+                    st.session_state["card_decisions"][pair_id] = "both"
+                    st.session_state["card_idx"] += 1
+                    st.experimental_rerun()
+                
+                if st.button("Skip", key="skip_card", help="Skip this pair", type="secondary", use_container_width=True):
+                    st.session_state["card_idx"] += 1
+                    st.experimental_rerun()
+                
+                if st.button("Prev", key="prev_card", help="Go to previous pair", type="secondary"):
+                    st.session_state["card_idx"] -= 1
+                    st.experimental_rerun()
+                
+                if st.button("Next", key="next_card", help="Go to next pair", type="secondary"):
+                    st.session_state["card_idx"] += 1
+                    st.experimental_rerun()
                     
-                    # Decision buttons with icons and better styling
-                    if st.button("👈 Keep Left (L)", key="keep_left", use_container_width=True):
-                        st.session_state["card_decisions"][pair_id] = "left"
-                        st.session_state["card_idx"] += 1
-                        st.experimental_rerun()
-                        
-                    if st.button("👉 Keep Right (R)", key="keep_right", use_container_width=True):
-                        st.session_state["card_decisions"][pair_id] = "right"
-                        st.session_state["card_idx"] += 1
-                        st.experimental_rerun()
-                        
-                    if st.button("🔄 Keep Both (B)", key="keep_both", use_container_width=True):
-                        st.session_state["card_decisions"][pair_id] = "both"
-                        st.session_state["card_idx"] += 1
-                        st.experimental_rerun()
-                    
-                    st.markdown("<hr style='margin:15px 0;'>", unsafe_allow_html=True)
-                    
-                    # Navigation buttons
-                    nav_col1, nav_col2, nav_col3 = st.columns([1,2,1])
-                    with nav_col1:
-                        if st.button("⬅️ Prev", key="prev_card"):
-                            st.session_state["card_idx"] -= 1
-                            st.experimental_rerun()
-                    
-                    with nav_col2:
-                        if st.button("⏭️ Skip (S)", key="skip_card", use_container_width=True):
-                            st.session_state["card_idx"] += 1
-                            st.experimental_rerun()
-                    
-                    with nav_col3:
-                        if st.button("➡️ Next", key="next_card"):
-                            st.session_state["card_idx"] += 1
-                            st.experimental_rerun()
-                    
-                    # Keyboard shortcuts
-                    st.markdown("""
-                    <script>
-                    document.addEventListener('keydown', function(e) {
-                        if (e.key === 'l' || e.key === 'L') {
-                            document.querySelector('button[key="keep_left"]').click();
-                        } else if (e.key === 'r' || e.key === 'R') {
-                            document.querySelector('button[key="keep_right"]').click();
-                        } else if (e.key === 'b' || e.key === 'B') {
-                            document.querySelector('button[key="keep_both"]').click();
-                        } else if (e.key === 's' || e.key === 'S') {
-                            document.querySelector('button[key="skip_card"]').click();
-                        } else if (e.key === 'ArrowLeft') {
-                            document.querySelector('button[key="prev_card"]').click();
-                        } else if (e.key === 'ArrowRight') {
-                            document.querySelector('button[key="next_card"]').click();
-                        }
-                    });
-                    </script>
-                    """, unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
+                # JavaScript for tab switching and button connections
+                st.markdown("""
+                <script>
+                // Tab switching functionality
+                document.getElementById('tab-diff').addEventListener('click', function() {
+                    document.getElementById('content-diff').style.display = 'block';
+                    document.getElementById('content-side').style.display = 'none';
+                    document.getElementById('content-details').style.display = 'none';
+                    document.getElementById('tab-diff').style.borderBottom = '2px solid #4e8df5';
+                    document.getElementById('tab-diff').style.color = '#4e8df5';
+                    document.getElementById('tab-side').style.borderBottom = 'none';
+                    document.getElementById('tab-side').style.color = '#aaa';
+                    document.getElementById('tab-details').style.borderBottom = 'none';
+                    document.getElementById('tab-details').style.color = '#aaa';
+                });
+                
+                document.getElementById('tab-side').addEventListener('click', function() {
+                    document.getElementById('content-diff').style.display = 'none';
+                    document.getElementById('content-side').style.display = 'block';
+                    document.getElementById('content-details').style.display = 'none';
+                    document.getElementById('tab-diff').style.borderBottom = 'none';
+                    document.getElementById('tab-diff').style.color = '#aaa';
+                    document.getElementById('tab-side').style.borderBottom = '2px solid #4e8df5';
+                    document.getElementById('tab-side').style.color = '#4e8df5';
+                    document.getElementById('tab-details').style.borderBottom = 'none';
+                    document.getElementById('tab-details').style.color = '#aaa';
+                });
+                
+                document.getElementById('tab-details').addEventListener('click', function() {
+                    document.getElementById('content-diff').style.display = 'none';
+                    document.getElementById('content-side').style.display = 'none';
+                    document.getElementById('content-details').style.display = 'block';
+                    document.getElementById('tab-diff').style.borderBottom = 'none';
+                    document.getElementById('tab-diff').style.color = '#aaa';
+                    document.getElementById('tab-side').style.borderBottom = 'none';
+                    document.getElementById('tab-side').style.color = '#aaa';
+                    document.getElementById('tab-details').style.borderBottom = '2px solid #4e8df5';
+                    document.getElementById('tab-details').style.color = '#4e8df5';
+                });
+                
+                // Connect custom buttons to hidden Streamlit buttons
+                document.getElementById('btn-keep-left').addEventListener('click', function() {
+                    document.querySelector('button[data-testid="baseButton-primary"][aria-label="Keep the left record (Master)"]').click();
+                });
+                
+                document.getElementById('btn-keep-right').addEventListener('click', function() {
+                    document.querySelector('button[data-testid="baseButton-primary"][aria-label="Keep the right record (Duplicate)"]').click();
+                });
+                
+                document.getElementById('btn-keep-both').addEventListener('click', function() {
+                    document.querySelector('button[data-testid="baseButton-primary"][aria-label="Keep both records"]').click();
+                });
+                
+                document.getElementById('btn-skip').addEventListener('click', function() {
+                    document.querySelector('button[data-testid="baseButton-secondary"][aria-label="Skip this pair"]').click();
+                });
+                
+                document.getElementById('btn-prev').addEventListener('click', function() {
+                    document.querySelector('button[data-testid="baseButton-secondary"][aria-label="Go to previous pair"]').click();
+                });
+                
+                document.getElementById('btn-next').addEventListener('click', function() {
+                    document.querySelector('button[data-testid="baseButton-secondary"][aria-label="Go to next pair"]').click();
+                });
+                
+                // Keyboard shortcuts
+                document.addEventListener('keydown', function(e) {
+                    if (e.key === 'l' || e.key === 'L') {
+                        document.getElementById('btn-keep-left').click();
+                    } else if (e.key === 'r' || e.key === 'R') {
+                        document.getElementById('btn-keep-right').click();
+                    } else if (e.key === 'b' || e.key === 'B') {
+                        document.getElementById('btn-keep-both').click();
+                    } else if (e.key === 's' || e.key === 'S') {
+                        document.getElementById('btn-skip').click();
+                    } else if (e.key === 'ArrowLeft') {
+                        document.getElementById('btn-prev').click();
+                    } else if (e.key === 'ArrowRight') {
+                        document.getElementById('btn-next').click();
+                    } else if (e.key === '1') {
+                        document.getElementById('tab-diff').click();
+                    } else if (e.key === '2') {
+                        document.getElementById('tab-side').click();
+                    } else if (e.key === '3') {
+                        document.getElementById('tab-details').click();
+                    }
+                });
+                </script>
+                """, unsafe_allow_html=True)
         else:
             st.info("No medium-confidence pairs to review.")
 
