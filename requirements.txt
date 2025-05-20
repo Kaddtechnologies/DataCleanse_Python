@@ -6,7 +6,7 @@ pathlib
 
 thefuzz[speedup]     # pulls python-levenshtein
 neofuzz              # optional, faster fuzzy
-st_aggrid            # optional interactive grid
+streamlit-aggrid     # optional interactive grid
 xlsxwriter           # Excel export (primary)
 openpyxl             # Excel export fallback
 openai               # for LLM integration
