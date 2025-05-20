@@ -1,0 +1,12 @@
+streamlit>=1.33
+pandas
+charset-normalizer
+python-dateutil
+pathlib
+
+thefuzz[speedup]     # pulls python-levenshtein
+neofuzz              # optional, faster fuzzy
+st_aggrid            # optional interactive grid
+xlsxwriter           # Excel export (primary)
+openpyxl             # Excel export fallback
+openai               # for LLM integration
