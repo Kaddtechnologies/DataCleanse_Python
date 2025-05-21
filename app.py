@@ -355,6 +355,10 @@ def build_duplicate_df(df: pd.DataFrame, col_map: DeduplicationColumnMap) -> Tup
             # Add to tracked pairs
             all_comparison_pairs.add((i1_idx, i2_idx))
             
+            # Check if indices exist in the DataFrame to prevent "cannot access local variable" error
+            if i1_idx not in work.index or i2_idx not in work.index:
+                continue
+                
             r1 = work.loc[i1_idx]
             r2 = work.loc[i2_idx]
 
@@ -369,7 +373,7 @@ def build_duplicate_df(df: pd.DataFrame, col_map: DeduplicationColumnMap) -> Tup
             name_s, best_name_method = get_best_similarity_score(name_scores)
             
             # If primary focus is name, and name similarity is too low, skip
-            if col_map.customer_name and name_s < 70:  # Threshold for name similarity
+            if col_map.customer_name and name_s < 50:  # Lower threshold for name similarity to catch more duplicates
                 continue
 
             # Address similarity using multiple metrics
@@ -477,7 +481,9 @@ def build_duplicate_df(df: pd.DataFrame, col_map: DeduplicationColumnMap) -> Tup
                     "Duplicates": [],
                     "master_uid": str(uuid.uuid4())
                 }
-            master_records_dict[master_row_excel_num]["Duplicates"].append(dup_detail)
+            # Ensure the master record exists before adding duplicates
+            if master_row_excel_num in master_records_dict:
+                master_records_dict[master_row_excel_num]["Duplicates"].append(dup_detail)
     
     # Process each blocking strategy
     for block_indices in blocks_prefix.values():
@@ -569,29 +575,52 @@ def build_duplicate_df(df: pd.DataFrame, col_map: DeduplicationColumnMap) -> Tup
             # Calculate similarity scores for this pair
             name_s = 0
             best_name_method = "none"
-            if col_map.customer_name and col_map.customer_name in r1 and col_map.customer_name in r2:
-                name_scores = calculate_similarity_scores(r1[col_map.customer_name], r2[col_map.customer_name])
-                name_s, best_name_method = get_best_similarity_score(name_scores)
+            try:
+                if col_map.customer_name and col_map.customer_name in r1 and col_map.customer_name in r2:
+                    name_scores = calculate_similarity_scores(r1[col_map.customer_name], r2[col_map.customer_name])
+                    name_s, best_name_method = get_best_similarity_score(name_scores)
+            except UnboundLocalError:
+                # Just use default values if r1 or r2 is not defined
+                name_s = 0
+                best_name_method = "none"
                 
             addr_s = 0
+            addr_s = 0
             best_addr_method = "none"
-            if col_map.address and col_map.address in r1 and col_map.address in r2:
-                addr_scores = calculate_similarity_scores(r1[col_map.address], r2[col_map.address])
+            addr_scores = {}  # Initialize addr_scores
+            try:
+                if col_map.address and col_map.address in r1 and col_map.address in r2:
+                    addr_scores = calculate_similarity_scores(r1[col_map.address], r2[col_map.address])
+                    addr_s, best_addr_method = get_best_similarity_score(addr_scores)
+            except UnboundLocalError:
+                # Just use default values if r1 or r2 is not defined
+                addr_s = 0
+                best_addr_method = "none"
                 addr_s, best_addr_method = get_best_similarity_score(addr_scores)
                 
             # City similarity
             city_s = 0
             best_city_method = "none"
-            if col_map.city and col_map.city in r1 and col_map.city in r2:
-                city_scores = calculate_similarity_scores(r1[col_map.city], r2[col_map.city])
-                city_s, best_city_method = get_best_similarity_score(city_scores)
+            try:
+                if col_map.city and col_map.city in r1 and col_map.city in r2:
+                    city_scores = calculate_similarity_scores(r1[col_map.city], r2[col_map.city])
+                    city_s, best_city_method = get_best_similarity_score(city_scores)
+            except UnboundLocalError:
+                # Just use default values if r1 or r2 is not defined
+                city_s = 0
+                best_city_method = "none"
             
             # Country similarity
             country_s = 0
             best_country_method = "none"
-            if col_map.country and col_map.country in r1 and col_map.country in r2:
-                country_scores = calculate_similarity_scores(r1[col_map.country], r2[col_map.country])
-                country_s, best_country_method = get_best_similarity_score(country_scores)
+            try:
+                if col_map.country and col_map.country in r1 and col_map.country in r2:
+                    country_scores = calculate_similarity_scores(r1[col_map.country], r2[col_map.country])
+                    country_s, best_country_method = get_best_similarity_score(country_scores)
+            except UnboundLocalError:
+                # Just use default values if r1 or r2 is not defined
+                country_s = 0
+                best_country_method = "none"
                 
             # Calculate overall similarity
             scores_present = []
@@ -796,7 +825,19 @@ async def run_deduplication(
     except Exception as e:
         # Catch any other unexpected errors
         # Log the error in a real application: import logging; logging.exception("Deduplication error")
-        return DeduplicationResponse(message=f"An unexpected error occurred: {str(e)}", error=str(e))
+        import traceback
+        import sys
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        error_traceback = traceback.format_exc()
+        
+        # Get the file name and line number where the exception occurred
+        fname = traceback.extract_tb(exc_tb)[-1][0]
+        line_no = traceback.extract_tb(exc_tb)[-1][1]
+        
+        error_message = f"Error at {fname}:{line_no} - {str(e)}"
+        print(f"Detailed error: {error_traceback}")
+        
+        return DeduplicationResponse(message=f"An unexpected error occurred: {error_message}", error=error_message)
 
 
 @app.get("/")
