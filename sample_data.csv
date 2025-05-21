@@ -1,0 +1,21 @@
+Customer Name,Address,City,Country,TPI
+Acme Corporation,123 Main St,New York,USA,AC001
+Acme Corp.,123 Main Street,New York,USA,AC002
+Globex Corporation,456 Oak Avenue,Chicago,USA,GL001
+Globex Corp,456 Oak Ave,Chicago,USA,GL002
+Soylent Corp,789 Pine Road,Los Angeles,USA,SC001
+Soylent Corporation,789 Pine Rd,Los Angeles,USA,SC002
+Initech Inc,321 Maple Drive,Boston,USA,IN001
+Initech Incorporated,321 Maple Dr,Boston,USA,IN002
+Umbrella Corporation,654 Elm Street,Seattle,USA,UM001
+Umbrella Corp,654 Elm St,Seattle,USA,UM002
+Wayne Enterprises,987 Cedar Lane,Gotham,USA,WE001
+Wayne Enterprises Inc.,987 Cedar Ln,Gotham,USA,WE002
+Stark Industries,159 Iron Road,Malibu,USA,SI001
+Stark Industries LLC,159 Iron Rd,Malibu,USA,SI002
+Cyberdyne Systems,753 Tech Blvd,San Francisco,USA,CS001
+Cyberdyne Systems Corp,753 Technology Blvd,San Francisco,USA,CS002
+Oscorp Industries,852 Spider Street,New York,USA,OI001
+Oscorp Industries Inc,852 Spider St,New York,USA,OI002
+LexCorp,741 Krypton Avenue,Metropolis,USA,LC001
+LexCorp Incorporated,741 Krypton Ave,Metropolis,USA,LC002

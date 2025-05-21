@@ -1,14 +1,12 @@
-streamlit>=1.33
+fastapi
+uvicorn
+python-multipart
 pandas
+thefuzz
+python-levenshtein
+jellyfish
+python-dotenv
+openai
 charset-normalizer
 python-dateutil
 pathlib
-python-dotenv        # for loading environment variables
-markdown
-
-thefuzz[speedup]     # pulls python-levenshtein
-neofuzz              # optional, faster fuzzy
-streamlit-aggrid     # optional interactive grid
-xlsxwriter           # Excel export (primary)
-openpyxl             # Excel export fallback
-openai               # for LLM integration
