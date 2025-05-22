@@ -1,4 +1,5 @@
 .env
+*.pyc
 ^^/.venv/Lib/site-packages/*
 .venv/Lib/site-packages/google/_upb/_message.pyd
 .venv/Lib/site-packages/google/protobuf/field_mask_pb2.py

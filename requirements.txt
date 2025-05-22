@@ -10,3 +10,4 @@ openai
 charset-normalizer
 python-dateutil
 pathlib
+openpyxl

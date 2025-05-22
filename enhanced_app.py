@@ -1101,6 +1101,6 @@ async def root():
     }
 
 # To run this app:
-# 1. Save as app.py
+# 1. Save as enhanced_app.py
 # 2. Install dependencies: pip install fastapi uvicorn pandas "python-multipart" "thefuzz[speedup]" openpyxl jellyfish python-dotenv requests
-# 3. Run with uvicorn: uvicorn app:app --reload
+# 3. Run with uvicorn: uvicorn enhanced_app:app --reload
