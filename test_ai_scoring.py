@@ -14,7 +14,7 @@ def test_ai_scoring(url="http://localhost:8001/deduplicate/"):
     print("\n=== TESTING AI CONFIDENCE SCORING ===")
     
     # Check if API key is available
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("OPEN-API-KEY")
     if not api_key:
         print("WARNING: No OpenAI API key found in .env file. AI scoring may not work.")
     else:

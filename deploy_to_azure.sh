@@ -132,7 +132,7 @@ if ($LASTEXITCODE -ne 0) {
         --memory 2.0Gi `
         --min-replicas 1 `
         --max-replicas 5 `
-        --env-vars "ENVIRONMENT=production" "PORT=8000" "HOST=0.0.0.0" "OPENAI_API_KEY=$env:OPENAI_API_KEY" `
+        --env-vars "ENVIRONMENT=production" "PORT=8000" "HOST=0.0.0.0" "OPEN-API-KEY=$env:OPEN-API-KEY" `
         --query properties.configuration.ingress.fqdn
 
     if ($LASTEXITCODE -ne 0) {
@@ -170,7 +170,7 @@ if ($LASTEXITCODE -ne 0) {
     az containerapp update `
         --name $ContainerAppName `
         --resource-group $ResourceGroup `
-        --set-env-vars "ENVIRONMENT=production" "PORT=8000" "HOST=0.0.0.0" "OPENAI_API_KEY=$env:OPENAI_API_KEY"
+        --set-env-vars "ENVIRONMENT=production" "PORT=8000" "HOST=0.0.0.0" "OPEN-API-KEY=$env:OPEN-API-KEY"
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Warning: Failed to update environment variables" -ForegroundColor Yellow

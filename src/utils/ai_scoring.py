@@ -26,7 +26,7 @@ async def apply_ai_confidence_scoring_async(master_records: List[Dict]) -> List[
         List[Dict]: The updated master records with AI confidence scores
     """
     # Get API key from environment
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("OPEN-API-KEY")
     if not api_key:
         print("Warning: OpenAI API key not found. Skipping AI confidence scoring.")
         return master_records
@@ -236,7 +236,7 @@ def process_records_synchronously(master_records: List[Dict]) -> List[Dict]:
         List[Dict]: The updated master records with AI confidence scores
     """
     # Get API key from environment
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("OPEN-API-KEY")
     if not api_key:
         print("Warning: OpenAI API key not found. Skipping AI confidence scoring.")
         return master_records

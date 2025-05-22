@@ -18,7 +18,7 @@ param(
     [string]$ImageTag = "latest",
     
     [Parameter(Mandatory=$false)]
-    [string]$OpenAIApiKey = $env:OPENAI_API_KEY,
+    [string]$OpenAIApiKey = [Environment]::GetEnvironmentVariable("OPEN-API-KEY"),
     
     [Parameter(Mandatory=$false)]
     [string]$OpenAIEndpoint = "",
@@ -199,7 +199,7 @@ if ($UseManagedIdentity) {
         $envVars += " AZURE_OPENAI_ENDPOINT=$OpenAIEndpoint"
     }
 } else {
-    $envVars += " OPENAI_API_KEY=secretref:openai-api-key"
+    $envVars += " OPEN-API-KEY=secretref:openai-api-key"
 }
 
 if (-not $containerAppExists) {
