@@ -1,141 +1,99 @@
-# Duplicate Finder API
+# DataCleansing API
 
-A FastAPI application for customer duplicate detection, designed for deployment in Azure Container Instances.
+A modular FastAPI application for finding and managing duplicate records in datasets.
 
-## Features
+## Project Structure
 
-- **File Upload**: Support for CSV and Excel files
-- **Dynamic Column Mapping**: No fixed headers required
-- **Fast Fuzzy Matching**: Using `thefuzz` with `python-levenshtein`
-- **AI Analysis**: For potential duplicates using OpenAI
-- **Export Functionality**: Export results as CSV or Excel
+The application has been organized into a modular structure for better maintainability:
 
-## Local Development
+```
+DataCleansing/
+├── app.py                  # Entry point that maintains backward compatibility
+├── requirements.txt        # Project dependencies
+├── README.md               # Project documentation
+└── src/                    # Source code directory
+    ├── __init__.py         # Package initialization
+    ├── main.py             # FastAPI app and endpoints
+    ├── models/             # Data models
+    │   ├── __init__.py
+    │   └── data_models.py  # Pydantic models for validation
+    ├── utils/              # Utility functions
+    │   ├── __init__.py
+    │   ├── text_processing.py  # Text normalization utilities
+    │   ├── fuzzy_matching.py   # String similarity functions
+    │   └── ai_scoring.py       # AI confidence scoring
+    └── core/               # Core business logic
+        ├── __init__.py
+        └── deduplication.py    # Main deduplication algorithm
+```
 
-### Prerequisites
+## Installation
 
-- Python 3.8+
-- pip
+1. Clone the repository:
+   ```
+   git clone <repository-url>
+   cd DataCleansing
+   ```
 
-### Setup
-
-1. Clone the repository
-2. Create a virtual environment:
+2. Create a virtual environment and activate it:
    ```
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
+
 3. Install dependencies:
    ```
    pip install -r requirements.txt
    ```
-4. Create a `.env` file with your OpenAI API key:
-   ```
-   OPENAI_API_KEY=your_api_key_here
-   ```
-5. Run the application:
-   ```
-   uvicorn app:app --reload
-   ```
-6. Access the API documentation at http://localhost:8000/docs
 
-## API Endpoints
+## Usage
 
-- `POST /upload`: Upload a CSV or Excel file
-- `GET /files/{file_id}/columns`: Get columns and suggested mappings
-- `POST /files/{file_id}/column-mapping`: Set column mapping
-- `POST /files/{file_id}/deduplicate`: Run deduplication
-- `GET /results/{result_id}`: Get deduplication results
-- `POST /results/{result_id}/ai-analysis`: Run AI analysis
-- `GET /results/{result_id}/export/{format}`: Export results (csv or excel)
+### Running the API
 
-## Docker
+Start the API server:
 
-Build the Docker image:
 ```
-docker build -t duplicate-finder-api .
+python app.py
 ```
 
-Run the container:
+The API will be available at http://localhost:8000.
+
+### API Endpoints
+
+- `GET /`: Root endpoint with a health check message
+- `GET /api/health`: Health check endpoint
+- `POST /api/find-duplicates`: Main endpoint for processing files and finding duplicates
+
+### Example API Request
+
+```python
+import requests
+
+url = "http://localhost:8000/api/find-duplicates"
+files = {"file": open("sample_data.csv", "rb")}
+form_data = {
+    "customer_name_column": "CompanyName",
+    "address_column": "Address",
+    "city_column": "City",
+    "country_column": "Country",
+    "use_prefix": "true",
+    "name_threshold": "70",
+    "overall_threshold": "70"
+}
+
+response = requests.post(url, files=files, data=form_data)
+result = response.json()
 ```
-docker run -p 8000:8000 -d duplicate-finder-api
-```
 
-## Deploying to Azure Container Instances
+## Development
 
-### Prerequisites
+### Adding New Features
 
-- Azure CLI
-- Azure Container Registry (ACR) access
-
-### Steps
-
-1. Log in to Azure:
-   ```
-   az login
-   ```
-
-2. Build and push the Docker image to ACR:
-   ```
-   az acr build --registry <your-acr-name> --image duplicate-finder-api:latest .
-   ```
-
-3. Create an Azure Container Instance:
-   ```
-   az container create \
-     --resource-group <your-resource-group> \
-     --name duplicate-finder-api \
-     --image <your-acr-name>.azurecr.io/duplicate-finder-api:latest \
-     --dns-name-label duplicate-finder-api \
-     --ports 8000 \
-     --environment-variables OPENAI_API_KEY=<your-openai-api-key>
-   ```
-
-4. Get the FQDN of your container:
-   ```
-   az container show \
-     --resource-group <your-resource-group> \
-     --name duplicate-finder-api \
-     --query ipAddress.fqdn \
-     --output tsv
-   ```
-
-5. Access your API at `http://<fqdn>:8000`
-
-## Using the API
-
-1. Upload a file:
-   ```
-   curl -X POST -F "file=@your_file.csv" http://localhost:8000/upload
-   ```
-
-2. Get the file columns:
-   ```
-   curl http://localhost:8000/files/{file_id}/columns
-   ```
-
-3. Set column mapping:
-   ```
-   curl -X POST -H "Content-Type: application/json" \
-     -d '{"customer_name": "Customer", "address": "Address"}' \
-     http://localhost:8000/files/{file_id}/column-mapping
-   ```
-
-4. Run deduplication:
-   ```
-   curl -X POST http://localhost:8000/files/{file_id}/deduplicate
-   ```
-
-5. Get results:
-   ```
-   curl http://localhost:8000/results/{result_id}
-   ```
-
-6. Export results:
-   ```
-   curl http://localhost:8000/results/{result_id}/export/csv > results.csv
-   ```
+1. Identify the appropriate module for your feature
+2. Implement the feature with proper documentation
+3. Update tests if applicable
+4. Update the README if necessary
 
 ## License
 
-This project is licensed under the MIT License.
+[Specify your license here]

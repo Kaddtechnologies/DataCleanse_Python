@@ -15,7 +15,19 @@ param(
     [string]$Location = "centralus",
 
     [Parameter(Mandatory=$false)]
-    [string]$ImageTag = "latest"
+    [string]$ImageTag = "latest",
+    
+    [Parameter(Mandatory=$false)]
+    [string]$OpenAIApiKey = $env:OPENAI_API_KEY,
+    
+    [Parameter(Mandatory=$false)]
+    [string]$OpenAIEndpoint = "",
+    
+    [Parameter(Mandatory=$false)]
+    [switch]$UseManagedIdentity = $false,
+    
+    [Parameter(Mandatory=$false)]
+    [string]$OpenAIResourceId = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -126,25 +138,103 @@ try {
     $containerAppExists = $false
 }
 
+# 7.1 Create user-managed identity if using managed identity
+$managedIdentityId = ""
+if ($UseManagedIdentity) {
+    Write-Host "Setting up managed identity for Azure OpenAI access..." -ForegroundColor Cyan
+    
+    # Check if managed identity already exists
+    $identityName = "$ContainerAppName-identity"
+    $identityExists = az identity show --name $identityName --resource-group $ResourceGroup 2>&1
+    
+    if ($LASTEXITCODE -ne 0) {
+        # Create managed identity
+        Write-Host "Creating managed identity: $identityName" -ForegroundColor Cyan
+        $identity = az identity create --name $identityName --resource-group $ResourceGroup | ConvertFrom-Json
+        $managedIdentityId = $identity.id
+        $principalId = $identity.principalId
+        
+        # Assign role to the managed identity if OpenAI resource ID is provided
+        if ($OpenAIResourceId) {
+            Write-Host "Assigning Cognitive Services OpenAI User role to managed identity..." -ForegroundColor Cyan
+            az role assignment create --assignee $principalId --scope $OpenAIResourceId --role "Cognitive Services OpenAI User"
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "Warning: Failed to assign role to managed identity. Please assign it manually." -ForegroundColor Yellow
+            } else {
+                Write-Host "Successfully assigned role to managed identity" -ForegroundColor Green
+            }
+        } else {
+            Write-Host "Warning: OpenAI Resource ID not provided. Please assign appropriate role to the managed identity manually." -ForegroundColor Yellow
+        }
+    } else {
+        # Use existing managed identity
+        $identity = $identityExists | ConvertFrom-Json
+        $managedIdentityId = $identity.id
+        Write-Host "Using existing managed identity: $identityName" -ForegroundColor Green
+    }
+} else {
+    # 7.2 Set up the OpenAI API key as a secret if not using managed identity
+    Write-Host "Setting up OpenAI API key as a secret..." -ForegroundColor Cyan
+    if ($OpenAIApiKey) {
+        az containerapp secret set `
+            --name $ContainerAppName `
+            --resource-group $ResourceGroup `
+            --secrets "openai-api-key=$OpenAIApiKey"
+        
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "Warning: Failed to set OpenAI API key as a secret. Will continue with environment variable." -ForegroundColor Yellow
+        } else {
+            Write-Host "Successfully set OpenAI API key as a secret" -ForegroundColor Green
+        }
+    } else {
+        Write-Host "Warning: OpenAI API key not provided. Make sure it's set in the container app." -ForegroundColor Yellow
+    }
+}
+
+# Set up environment variables based on authentication method
+$envVars = "ENVIRONMENT=production PORT=8000 HOST=0.0.0.0"
+if ($UseManagedIdentity) {
+    $envVars += " USE_MANAGED_IDENTITY=true"
+    if ($OpenAIEndpoint) {
+        $envVars += " AZURE_OPENAI_ENDPOINT=$OpenAIEndpoint"
+    }
+} else {
+    $envVars += " OPENAI_API_KEY=secretref:openai-api-key"
+}
+
 if (-not $containerAppExists) {
     Write-Host "Creating new Container App..." -ForegroundColor Cyan
-    az containerapp create `
-        --name $ContainerAppName `
-        --resource-group $ResourceGroup `
-        --environment $envName `
-        --registry-server $acrLoginServer `
-        --registry-username $acrUsername `
-        --registry-password $acrPassword `
-        --image $fullImageName `
-        --target-port 8000 `
-        --ingress external `
-        --cpu 1.0 `
-        --memory 2.0Gi `
-        --min-replicas 1 `
-        --max-replicas 5 `
-        --env-vars "ENVIRONMENT=production" "PORT=8000" "HOST=0.0.0.0" "OPENAI_API_KEY=$env:OPENAI_API_KEY" `
-        --query properties.configuration.ingress.fqdn
-
+    
+    # Base command for creating container app
+    $createCmd = "az containerapp create " +
+        "--name $ContainerAppName " +
+        "--resource-group $ResourceGroup " +
+        "--environment $envName " +
+        "--registry-server $acrLoginServer " +
+        "--registry-username $acrUsername " +
+        "--registry-password $acrPassword " +
+        "--image $fullImageName " +
+        "--target-port 8000 " +
+        "--ingress external " +
+        "--cpu 1.0 " +
+        "--memory 2.0Gi " +
+        "--min-replicas 1 " +
+        "--max-replicas 5 "
+    
+    # Add user-assigned identity if using managed identity
+    if ($UseManagedIdentity -and $managedIdentityId) {
+        $createCmd += "--user-assigned $managedIdentityId "
+    } else {
+        $createCmd += "--secrets `"openai-api-key=$OpenAIApiKey`" "
+    }
+    
+    # Add environment variables
+    $createCmd += "--env-vars `"$envVars`" " +
+        "--query properties.configuration.ingress.fqdn"
+    
+    # Execute the command
+    Invoke-Expression $createCmd
+    
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Failed to create Container App" -ForegroundColor Red
         exit 1
@@ -176,11 +266,25 @@ if (-not $containerAppExists) {
         Write-Host "Warning: Failed to update registry credentials" -ForegroundColor Yellow
     }
 
+    # Add user-assigned identity if using managed identity
+    if ($UseManagedIdentity -and $managedIdentityId) {
+        az containerapp identity assign `
+            --name $ContainerAppName `
+            --resource-group $ResourceGroup `
+            --user-assigned $managedIdentityId
+        
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "Warning: Failed to assign managed identity to Container App" -ForegroundColor Yellow
+        } else {
+            Write-Host "Successfully assigned managed identity to Container App" -ForegroundColor Green
+        }
+    }
+
     # Set environment variables
     az containerapp update `
         --name $ContainerAppName `
         --resource-group $ResourceGroup `
-        --set-env-vars "ENVIRONMENT=production" "PORT=8000" "HOST=0.0.0.0" "OPENAI_API_KEY=$env:OPENAI_API_KEY"
+        --set-env-vars $envVars
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Warning: Failed to update environment variables" -ForegroundColor Yellow

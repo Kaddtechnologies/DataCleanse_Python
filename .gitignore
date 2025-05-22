@@ -16616,3 +16616,4 @@
 .venv/share/jupyter/nbextensions/pydeck/index.js
 .venv/share/jupyter/nbextensions/pydeck/index.js.map
 .env
+__pycache__/app.cpython-313.pyc
